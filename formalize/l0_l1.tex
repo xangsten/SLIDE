@@ -1,0 +1,1026 @@
+\documentclass[11pt, a4paper]{article}
+\usepackage[a4paper, margin=2.3cm]{geometry}
+\usepackage{fontspec}
+\usepackage[russian, bidi=basic, provide=*]{babel}
+\babelprovide[import, onchar=ids fonts]{english}
+\babelfont{rm}{Noto Sans}
+\usepackage{enumitem}
+\setlist[itemize]{label=-}
+\usepackage{amsmath, amssymb, amsthm}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{xcolor}
+\usepackage{hyperref}
+
+\definecolor{accentblue}{RGB}{24, 64, 118}
+\definecolor{subgray}{RGB}{90, 98, 110}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=accentblue,
+    citecolor=accentblue,
+    urlcolor=accentblue
+}
+
+\newtheorem{theorem}{Теорема}[section]
+\newtheorem{lemma}{Лемма}[section]
+\newtheorem{proposition}{Утверждение}[section]
+\newtheorem{corollary}{Следствие}[section]
+
+\theoremstyle{definition}
+\newtheorem{definition}{Определение}[section]
+\newtheorem{example}{Пример}[section]
+\newtheorem{remark}{Замечание}[section]
+
+\renewcommand{\proofname}{Доказательство}
+
+\title{\textbf{\color{accentblue}Покомпонентное разделение оракульных сложностей\\для монотонных вариационных неравенств\\и седловых задач при $(L_0, L_1)$-гладкости}}
+\author{Подробный аналитический обзор и пошаговые доказательства}
+\date{Ноябрь 2026}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+Настоящий документ представляет собой замкнутое в себе изложение теории и алгоритмов решения композитных монотонных вариационных неравенств и билинейно-связанных выпукло-вогнутых седловых задач в условиях обобщённой симметричной $(L_0, L_1)$-гладкости. Изложение построено с нуля: мы последовательно вводим математическую постановку задачи, объясняем природу $(L_0, L_1)$-гладкости и принцип работы многоуровневого рекурсивного слайдинга Бородич--Гасникова--Ковалёва (ICML 2025), после чего приводим полные пошаговые доказательства. В работе подробно разобраны: (1) базовое исчисление $(L_0, L_1)$-гладких функций, включая вывод беэкспоненциального неравенства через супремум при наличии конечной глобальной константы $L$ и глобальную кокоэрцитивность сдвинутой функции; (2) инвариантность параметров $(L_{0,i}, L_{1,i})$ при рекурсивном масштабировании; (3) прямой перенос рекурсивного алгоритма на произвольное число компонент $n \ge 2$ с локализацией на шаре радиуса $D$ (Вариант~А); (4) двухфазная схема с предварительным прогревом $(L_0, L_1)$-экстраградиентом и последующим локальным слайдингом с рестартами (Вариант~Б), позволяющая устранить экспоненциальный множитель $\exp(L_{1,i} R_0)$ при сильной монотонности; (5) разрушение глобального условия регулярности для седловых задач при $L_{1,y} > 0$, его центрированная замена и адаптация метода рестартов с демпфированием локальных оценок гладкости; (6) формальные алгебраические препятствия при попытке динамически изменять веса внутри рекурсии и сравнение с результатами 2026 года для гёльдеровой и обобщённой гладкости.
+\end{abstract}
+
+\tableofcontents
+\newpage
+
+% ==============================================================================
+\section{Введение и постановка задачи с нуля}
+% ==============================================================================
+
+Многие задачи машинного обучения, теории игр, математической экономики и численного решения дифференциальных уравнений формулируются не как минимизация одной скалярной функции, а как поиск равновесия или седловой точки. Универсальным математическим языком для описания таких задач служат \emph{монотонные вариационные неравенства} (ВН).
+
+\subsection{Композитные монотонные вариационные неравенства}
+
+Пусть $\mathcal{C} \subseteq \mathbb{R}^d$ --- непустое замкнутое выпуклое множество. Рассмотрим задачу поиска точки $z^* \in \mathcal{C}$, удовлетворяющей композитному вариационному неравенству:
+\begin{equation}\label{eq:vi_main}
+\text{найти } z^* \in \mathcal{C} \quad \text{такое, что} \quad \langle Q(z^*), z - z^* \rangle + p(z) - p(z^*) \ge 0 \quad \forall z \in \mathcal{C},
+\end{equation}
+где:
+\begin{itemize}
+    \item $p : \mathcal{C} \to \mathbb{R}$ --- выпуклая дифференцируемая функция (потенциальная или градиентная часть задачи);
+    \item $Q : \mathcal{C} \to \mathbb{R}^d$ --- непрерывный монотонный оператор (непотенциальная или кососимметричная/вращательная часть задачи), то есть $\langle Q(u) - Q(v), u - v \rangle \ge 0$ для всех $u, v \in \mathcal{C}$.
+\end{itemize}
+
+Если функция $p$ дифференцируема на открытой окрестности $\mathcal{C}$, то выпуклость $p$ делает условие~\eqref{eq:vi_main} эквивалентным стандартному вариационному неравенству для суммарного оператора $F(z) := \nabla p(z) + Q(z)$:
+\begin{equation}\label{eq:vi_grad}
+\langle \nabla p(z^*) + Q(z^*),\, z - z^* \rangle \ge 0 \quad \forall z \in \mathcal{C}.
+\end{equation}
+В частности, если $\mathcal{C} = \mathbb{R}^d$ (задача без ограничений), условие~\eqref{eq:vi_grad} превращается в систему нелинейных уравнений:
+\begin{equation}\label{eq:vi_unconstrained}
+\nabla p(z^*) + Q(z^*) = 0.
+\end{equation}
+
+\begin{remark}[Критическое отличие ВН от минимизации]\label{rem:grad_nonzero}
+В классической задаче минимизации ($Q \equiv 0$, $\mathcal{C} = \mathbb{R}^d$) в точке решения $z^*$ градиент обращается в нуль: $\nabla p(z^*) = 0$. В вариационном неравенстве~\eqref{eq:vi_unconstrained} выполнено лишь $\nabla p(z^*) = -Q(z^*)$, поэтому \emph{индивидуальный градиент $\nabla p(z^*)$ в точке решения, вообще говоря, отличен от нуля} и может быть сколь угодно большим. Это обстоятельство играет решающую роль при анализе $(L_0, L_1)$-гладкости.
+\end{remark}
+
+\subsection{Многокомпонентная структура и идея разделения сложностей}
+
+В современных приложениях функция $p$ и оператор $Q$ раскладываются в сумму $n$ компонент (блоков):
+\begin{equation}\label{eq:sum_structure}
+p(z) = \sum_{i=1}^n p_i(z), \qquad Q(z) = \sum_{i=1}^n Q_i(z),
+\end{equation}
+где каждая пара $(p_i, Q_i)$ имеет собственную вычислительную стоимость и собственные параметры гладкости:
+\begin{itemize}
+    \item функция $p_i$ характеризуется параметрами градиентной гладкости (классической константой Липшица $L_i$ или парой $(L_{0,i}, L_{1,i})$);
+    \item оператор $Q_i$ является монотонным и $M_i$-липшицевым, то есть $\Vert Q_i(u) - Q_i(v) \Vert_* \le M_i \Vert u - v \Vert$ для всех $u, v \in \mathcal{C}$.
+\end{itemize}
+
+\textbf{Зачем нужно покомпонентное разделение?} Представим задачу с $n = 2$ компонентами, где $p_1$ очень «жёсткая» (константа гладкости $L_1 = 10^8$), но её градиент вычисляется дёшево, а $p_2$ очень «мягкая» ($L_2 = 1$), но её вычисление требует дорогого прохода по большим данным или решения вспомогательной задачи. Если применять классический метод ко всей сумме $p = p_1 + p_2$ целиком, шаг метода будет диктоваться худшей константой $L_{\max} = \max\{L_1, L_2\} = 10^8$, и на каждой из $\mathcal{O}(\sqrt{L_{\max}/\varepsilon})$ итераций придётся вызывать оба оракула $\nabla p_1$ и $\nabla p_2$.
+
+Методы \emph{градиентного слайдинга} (Gradient Sliding), развитые в серии работ Лэна и соавторов и доведённые до оптимальной многокомпонентной формы в статье Е.~Бородич, А.~Гасникова и Д.~Ковалёва (ICML 2025)~\cite{Borodich2025}, позволяют вызывать оракул каждой пары $(p_i, Q_i)$ только столько раз, сколько требуют её \emph{собственные} параметры гладкости:
+\begin{equation}\label{eq:borodich_classical_rate}
+N(\nabla p_i),\; N(Q_i) = \mathcal{O}\!\left(6^n \max\left\{\sqrt{\frac{L_i}{\varepsilon}},\; \frac{M_i}{\varepsilon},\; 1\right\}\right), \qquad i = 1, \dots, n.
+\end{equation}
+В приведённом выше примере $\nabla p_1$ будет вызван $\mathcal{O}(\sqrt{10^8/\varepsilon}) = \mathcal{O}(10^4/\sqrt{\varepsilon})$ раз, тогда как дорогой оракул $\nabla p_2$ --- всего $\mathcal{O}(1/\sqrt{\varepsilon})$ раз.
+
+\subsection{Связь с билинейными седловыми задачами}
+
+Важнейшим частным случаем композитного ВН~\eqref{eq:vi_main}--\eqref{eq:sum_structure} является выпукло-вогнутая седловая задача с билинейной связью:
+\begin{equation}\label{eq:saddle_problem}
+\min_{x \in \mathcal{X}} \max_{y \in \mathcal{Y}} \mathcal{L}(x, y) := f(x) + \langle B x, y \rangle - g(y),
+\end{equation}
+где $\mathcal{X} \subseteq \mathbb{R}^{d_x}$ и $\mathcal{Y} \subseteq \mathbb{R}^{d_y}$ --- замкнутые выпуклые множества, $f : \mathcal{X} \to \mathbb{R}$ --- $\mu_x$-сильно выпуклая функция ($\mu_x \ge 0$), $g : \mathcal{Y} \to \mathbb{R}$ --- $\mu_y$-сильно выпуклая функция ($\mu_y \ge 0$), а $B \in \mathbb{R}^{d_y \times d_x}$ --- матрица линейного взаимодействия с операторной нормой $L_{xy} = \Vert B \Vert_{\mathrm{op}}$.
+
+Положив $z = (x, y) \in \mathcal{C} = \mathcal{X} \times \mathcal{Y}$, седловую задачу~\eqref{eq:saddle_problem} можно записать как ВН с $n = 2$ (или $n = 3$ при выделении квадратичного регуляризатора связи $p_3$):
+\begin{equation}\label{eq:saddle_as_vi}
+p_1(x, y) = f(x), \qquad p_2(x, y) = g(y), \qquad Q(x, y) = \begin{pmatrix} B^\top y \\ -B x \end{pmatrix}.
+\end{equation}
+Оператор $Q$ кососимметричен: $\langle Q(z), z \rangle = \langle B^\top y, x \rangle - \langle B x, y \rangle = 0$ для всех $z$, поэтому он монотонен. При этом $\nabla p_1(x^*, y^*) = (\nabla f(x^*), 0) = (-B^\top y^*, 0)$ при $\mathcal{X} = \mathbb{R}^{d_x}$, что наглядно иллюстрирует Замечание~\ref{rem:grad_nonzero}.
+
+\subsection{Критерий качества решения (относительный зазор)}
+
+Для измерения точности приближённого решения $z_{\mathrm{out}} \in \mathcal{C}$ в монотонном ВН используется дуальный (или ограниченный) зазор. Пусть $P \succ 0$ --- симметричная положительно определённая матрица масштабирования, задающая норму $\Vert z \Vert_P := \sqrt{\langle P z, z \rangle}$ и сопряжённую норму $\Vert w \Vert_{P^{-1}} := \sqrt{\langle P^{-1} w, w \rangle}$. В работе~\cite{Borodich2025} (Теорема~4.5 и Следствие~4.6) точность $\epsilon > 0$ определяется через неравенство вида
+\begin{equation}\label{eq:gap_criterion}
+\langle Q(\hat{z}), z_{\mathrm{out}} - \hat{z} \rangle + p(z_{\mathrm{out}}) - p(\hat{z}) \le \frac{\epsilon}{2} \Vert \hat{z} - z_{\mathrm{in}} \Vert_P^2 \qquad \forall \hat{z} \in \mathcal{C},
+\end{equation}
+где $z_{\mathrm{in}} \in \mathcal{C}$ --- начальная точка запуска алгоритма. При подстановке $\hat{z} = z^*$ левая часть~\eqref{eq:gap_criterion} неотрицательна в силу~\eqref{eq:vi_main}. В случае $\mu$-сильной выпуклости функции $p$ (относительно нормы $\Vert \cdot \Vert_P$) левая часть~\eqref{eq:gap_criterion} при $\hat{z} = z^*$ оценивается снизу величиной $\frac{\mu}{2} \Vert z_{\mathrm{out}} - z^* \Vert_P^2$, что позволяет применять схему \emph{рестартов} (перезапусков) и получать линейную сходимость вида $\mathcal{O}(\log(1/\rho))$.
+
+% ==============================================================================
+\section{Обобщённая $(L_0, L_1)$-гладкость: смысл, примеры и базовое исчисление}
+% ==============================================================================
+
+\subsection{Почему классическая $L$-гладкость слишком ограничительна}
+
+Классическая теория выпуклой оптимизации предполагает, что функция $f : \mathbb{R}^d \to \mathbb{R}$ является $L$-гладкой, то есть её градиент липшицев с некоторой глобальной константой $L > 0$:
+\begin{equation}\label{eq:classical_L}
+\Vert \nabla f(x) - \nabla f(y) \Vert_* \le L \Vert x - y \Vert \qquad \forall x, y \in \mathbb{R}^d.
+\end{equation}
+Геометрически это означает, что кривизна графика $f$ (норма гессиана $\Vert \nabla^2 f(x) \Vert$) ограничена сверху одной и той же константой $L$ во всём пространстве. Однако для многих базовых функций (экспоненциальных, логистических, полиномиальных высокой степени, функций потерь глубоких нейросетей) кривизна растёт вместе с нормой градиента.
+
+\begin{example}[Экспоненциальный рост кривизны]\label{ex:exp_cosh}
+Рассмотрим одномерную выпуклую функцию $f(x) = e^{L_1 x} - L_1 x$ при $L_1 > 0$ (или $g(y) = \cosh(L_1 y) - 1$). Её производные равны $f'(x) = L_1(e^{L_1 x} - 1)$ и $f''(x) = L_1^2 e^{L_1 x}$.
+\begin{itemize}
+    \item На всём $\mathbb{R}$ супремум второй производной равен $+\infty$, поэтому классической глобальной константы $L$ не существует вовсе ($L = +\infty$).
+    \item Если искусственно ограничить область шаром $|x| \le D$ большого радиуса $D$, глобальная константа на шаре равна $L(D) = L_1^2 e^{L_1 D}$ --- она огромна. В то же время вблизи оптимума $x^* = 0$ вторая производная равна всего $f''(0) = L_1^2$.
+    \item Заметим, что всюду на $\mathbb{R}$ выполняется тождество $f''(x) = L_1^2 + L_1 f'(x)$ при $x \ge 0$, и в общем случае $|f''(x)| \le L_1^2 + L_1 |f'(x)|$. Таким образом, кривизна растёт не произвольно, а \emph{не более чем линейно по норме градиента}.
+\end{itemize}
+\end{example}
+
+\subsection{Определение симметричной $(L_0, L_1)$-гладкости}
+
+Чтобы формализовать такое поведение без требования двукратной дифференцируемости, в работах~\cite{Zhang2020, Gorbunov2024} введено следующее определение.
+
+\begin{definition}[Симметричная $(L_0, L_1)$-гладкость, Assumption~3 в~\cite{Gorbunov2024}]\label{def:l0l1}
+Дифференцируемая функция $f : \mathcal{X} \to \mathbb{R}$ (на выпуклом множестве $\mathcal{X}$) называется \emph{симметрично $(L_0, L_1)$-гладкой} относительно нормы $\Vert \cdot \Vert$ с параметрами $L_0 \ge 0$ и $L_1 \ge 0$, если для любых $x, y \in \mathcal{X}$ выполняется неравенство
+\begin{equation}\label{eq:def_l0l1}
+\Vert \nabla f(y) - \nabla f(x) \Vert_* \le \left(L_0 + L_1 \sup_{\xi \in [x, y]} \Vert \nabla f(\xi) \Vert_*\right) \Vert y - x \Vert,
+\end{equation}
+где $[x, y] := \{x + s(y - x) : s \in [0, 1]\}$ --- отрезок, соединяющий точки $x$ и $y$.
+\end{definition}
+
+При $L_1 = 0$ определение~\eqref{eq:def_l0l1} переходит в классическую $L_0$-гладкость~\eqref{eq:classical_L}. Для дважды дифференцируемой функции условие~\eqref{eq:def_l0l1} эквивалентно оценке на операторную норму гессиана $\Vert \nabla^2 f(\xi) \Vert \le L_0 + L_1 \Vert \nabla f(\xi) \Vert_*$.
+
+\subsection{Лемма Гронуолла и экспоненциальная квадратичная оценка}
+
+Чтобы применять неравенство~\eqref{eq:def_l0l1} в анализе алгоритмов, необходимо оценить сверху неизвестный $\sup_{\xi \in [x, y]} \Vert \nabla f(\xi) \Vert_*$ через градиент в известной точке $x$ и расстояние $r = \Vert y - x \Vert$. Если глобальной константы $L$ нет, эта оценка неизбежно содержит экспоненциальный множитель $\exp(L_1 r)$. Докажем этот фундаментальный факт (Лемма~2.1 в~\cite{Gorbunov2024}) полностью с нуля.
+
+\begin{lemma}[Экспоненциальный рост градиента и квадратичная верхняя оценка]\label{lem:gronwall_l0l1}
+Пусть $f : \mathcal{X} \to \mathbb{R}$ симметрично $(L_0, L_1)$-гладкая. Тогда для любых $x, y \in \mathcal{X}$ с $r := \Vert y - x \Vert$ и любой точки $\xi \in [x, y]$ справедливы оценки:
+\begin{align}
+L_0 + L_1 \Vert \nabla f(\xi) \Vert_* &\le \big(L_0 + L_1 \Vert \nabla f(x) \Vert_*\big) \exp(L_1 r), \label{eq:grad_exp_bound} \\
+\Vert \nabla f(y) - \nabla f(x) \Vert_* &\le \big(L_0 + L_1 \Vert \nabla f(x) \Vert_*\big) \exp(L_1 r) \cdot r, \label{eq:grad_diff_exp} \\
+\big| f(y) - f(x) - \langle \nabla f(x), y - x \rangle \big| &\le \frac{L_0 + L_1 \Vert \nabla f(x) \Vert_*}{2} \exp(L_1 r) \cdot r^2. \label{eq:quad_upper_exp}
+\end{align}
+\end{lemma}
+
+\begin{proof}
+Если $L_1 = 0$ или $r = 0$, неравенства тривиальны. Пусть $L_1 > 0$ и $r > 0$. Параметризуем отрезок $[x, y]$ точками $\xi(s) = x + s(y - x)$ для $s \in [0, 1]$ и определим неубывающую функцию
+\[
+M(s) := \sup_{\tau \in [0, s]} \big(L_0 + L_1 \Vert \nabla f(\xi(\tau)) \Vert_*\big), \qquad s \in [0, 1].
+\]
+Для любых $0 \le \tau_1 \le \tau_2 \le s$ отрезок $[\xi(\tau_1), \xi(\tau_2)]$ содержится в $[\xi(0), \xi(s)]$, поэтому
+\[
+\sup_{\zeta \in [\xi(\tau_1), \xi(\tau_2)]} \Vert \nabla f(\zeta) \Vert_* \le \sup_{\tau \in [0, s]} \Vert \nabla f(\xi(\tau)) \Vert_*.
+\]
+Применяя определение~\eqref{eq:def_l0l1} к паре $\xi(\tau_1), \xi(\tau_2)$ с $\Vert \xi(\tau_2) - \xi(\tau_1) \Vert = (\tau_2 - \tau_1) r$, получаем
+\[
+\Vert \nabla f(\xi(\tau_2)) - \nabla f(\xi(\tau_1)) \Vert_* \le M(s) (\tau_2 - \tau_1) r.
+\]
+В частности, функция $s \mapsto \nabla f(\xi(s))$ липшицева на $[0, 1]$, откуда следует абсолютная непрерывность функции $M(s)$. Кроме того, для любого $\tau \in [0, s]$ и любого $\delta > 0$ имеем при $\tau \in [s, s+\delta]$:
+\[
+L_0 + L_1 \Vert \nabla f(\xi(\tau)) \Vert_* \le L_0 + L_1 \Vert \nabla f(\xi(s)) \Vert_* + L_1 \Vert \nabla f(\xi(\tau)) - \nabla f(\xi(s)) \Vert_* \le M(s) + L_1 r M(s+\delta) \delta.
+\]
+Переходя к супремуму по $\tau \in [0, s+\delta]$, получаем $M(s+\delta) - M(s) \le L_1 r M(s+\delta) \delta$. Деля на $\delta > 0$ и переходя к пределу при $\delta \to +0$ в точках дифференцируемости $M$ (почти всюду на $[0, 1]$), находим дифференциальное неравенство Гронуолла:
+\[
+M'(s) \le L_1 r \, M(s).
+\]
+Поскольку $M(s) \ge L_0 > 0$ (при $L_0 = 0$ и $\nabla f(x) = 0$ из $M(s+\delta)(1 - L_1 r \delta) \le M(s)$ сразу следует $M(s) \equiv 0$), деление на $M(s)$ и интегрирование по $s \in [0, 1]$ дают $\ln \frac{M(1)}{M(0)} \le L_1 r$, то есть
+\[
+M(1) \le M(0) \exp(L_1 r) = \big(L_0 + L_1 \Vert \nabla f(x) \Vert_*\big) \exp(L_1 r).
+\]
+Поскольку $L_0 + L_1 \Vert \nabla f(\xi) \Vert_* \le M(1)$ для всех $\xi \in [x, y]$, это доказывает~\eqref{eq:grad_exp_bound}. Подстановка $M(1)$ в~\eqref{eq:def_l0l1} немедленно даёт~\eqref{eq:grad_diff_exp}.
+
+Для доказательства~\eqref{eq:quad_upper_exp} воспользуемся интегральной формулой Ньютона--Лейбница вдоль отрезка $\xi(t) = x + t(y - x)$, $t \in [0, 1]$:
+\[
+f(y) - f(x) - \langle \nabla f(x), y - x \rangle = \int_0^1 \langle \nabla f(\xi(t)) - \nabla f(x),\, y - x \rangle \, dt.
+\]
+Оценивая модуль скалярного произведения по неравенству Коши--Буняковского--Гёльдера и применяя~\eqref{eq:grad_diff_exp} к паре $(\xi(t), x)$ на расстоянии $\Vert \xi(t) - x \Vert = t r \le r$, получаем:
+\begin{align*}
+\big| f(y) - f(x) - \langle \nabla f(x), y - x \rangle \big| &\le \int_0^1 \Vert \nabla f(\xi(t)) - \nabla f(x) \Vert_* \cdot \Vert y - x \Vert \, dt \\
+&\le \int_0^1 \big(L_0 + L_1 \Vert \nabla f(x) \Vert_*\big) \exp(L_1 t r) \cdot t r^2 \, dt \\
+&\le \big(L_0 + L_1 \Vert \nabla f(x) \Vert_*\big) \exp(L_1 r) r^2 \int_0^1 t \, dt = \frac{L_0 + L_1 \Vert \nabla f(x) \Vert_*}{2} \exp(L_1 r) r^2.
+\end{align*}
+Лемма полностью доказана.
+\end{proof}
+
+\begin{remark}[Ключевое наблюдение о локальности]
+Из Леммы~\ref{lem:gronwall_l0l1} видна главная дихотомия $(L_0, L_1)$-гладкости:
+\begin{itemize}
+    \item если шаг или радиус области мал ($L_1 r \le c = \mathcal{O}(1)$), множитель $\exp(L_1 r) \le e^c$ является обычной константой, и функция ведёт себя как гладкая с локальной константой $e^c (L_0 + L_1 \Vert \nabla f(x) \Vert_*)$;
+    \item если же $L_1 r \gg 1$, множитель $\exp(L_1 r)$ растёт экспоненциально по радиусу области.
+\end{itemize}
+\end{remark}
+
+\subsection{Вывод неравенства без экспоненты через супремум при конечной глобальной $L$}
+
+Во многих практических задачах функция $f$ обладает одновременно двумя свойствами: она симметрично $(L_0, L_1)$-гладкая с умеренными параметрами $(L_0, L_1)$ и при этом имеет конечную, хотя и очень большую, глобальную константу Липшица градиента $L$ (например, когда экспоненциальный рост обрезан или сглажен на далёкой периферии, так что $L_0 \ll L$).
+
+Возникает естественный вопрос: \emph{можно ли при наличии конечной $L$ вывести неравенства для $(L_0, L_1)$-гладкой функции вообще без экспоненты $\exp(L_1 r)$, оценив супремум в определении~\eqref{eq:def_l0l1} напрямую?} Следующее утверждение даёт положительный ответ.
+
+\begin{proposition}[Неравенства без экспоненты при известной глобальной $L$]\label{prop:no_exp_finite_L}
+Пусть $f : \mathcal{X} \to \mathbb{R}$ одновременно глобально $L$-гладкая~\eqref{eq:classical_L} и симметрично $(L_0, L_1)$-гладкая~\eqref{eq:def_l0l1}. Тогда для любых $x, y \in \mathcal{X}$ с $r := \Vert y - x \Vert$ справедливы оценки без экспоненты:
+\begin{align}
+\Vert \nabla f(y) - \nabla f(x) \Vert_* &\le \big(L_0 + L_1 \Vert \nabla f(x) \Vert_*\big) r + L_1 L r^2, \label{eq:grad_no_exp} \\
+\big| f(y) - f(x) - \langle \nabla f(x), y - x \rangle \big| &\le \frac{1}{2}\big(L_0 + L_1 \Vert \nabla f(x) \Vert_*\big) r^2 + \frac{1}{3} L_1 L r^3. \label{eq:func_no_exp}
+\end{align}
+\end{proposition}
+
+\begin{proof}
+Возьмём произвольную точку $\xi(s) = x + s(y - x)$, $s \in [0, 1]$, на отрезке $[x, y]$. По неравенству треугольника и глобальной $L$-гладкости~\eqref{eq:classical_L} имеем:
+\[
+\Vert \nabla f(\xi(s)) \Vert_* \le \Vert \nabla f(x) \Vert_* + \Vert \nabla f(\xi(s)) - \nabla f(x) \Vert_* \le \Vert \nabla f(x) \Vert_* + L \Vert \xi(s) - x \Vert = \Vert \nabla f(x) \Vert_* + L s r \le \Vert \nabla f(x) \Vert_* + L r.
+\]
+Поскольку правая часть не зависит от $s \in [0, 1]$, переходя к супремуму по $\xi \in [x, y]$, получаем линейную верхнюю оценку без экспоненты:
+\[
+\sup_{\xi \in [x, y]} \Vert \nabla f(\xi) \Vert_* \le \Vert \nabla f(x) \Vert_* + L r.
+\]
+Подставляя эту границу непосредственно в определение~\eqref{eq:def_l0l1}, приходим к~\eqref{eq:grad_no_exp}:
+\[
+\Vert \nabla f(y) - \nabla f(x) \Vert_* \le \Big(L_0 + L_1 \big(\Vert \nabla f(x) \Vert_* + L r\big)\Big) r = \big(L_0 + L_1 \Vert \nabla f(x) \Vert_*\big) r + L_1 L r^2.
+\]
+Далее запишем точное интегральное тождество для $t \in [0, 1]$ и применим~\eqref{eq:grad_no_exp} на отрезке $[x, x + t(y - x)]$ длины $t r$:
+\begin{align*}
+\big| f(y) - f(x) - \langle \nabla f(x), y - x \rangle \big| &\le \int_0^1 \Vert \nabla f(x + t(y - x)) - \nabla f(x) \Vert_* \cdot r \, dt \\
+&\le \int_0^1 \Big(\big(L_0 + L_1 \Vert \nabla f(x) \Vert_*\big) t r + L_1 L t^2 r^2\Big) r \, dt \\
+&= \big(L_0 + L_1 \Vert \nabla f(x) \Vert_*\big) r^2 \int_0^1 t \, dt + L_1 L r^3 \int_0^1 t^2 \, dt \\
+&= \frac{1}{2}\big(L_0 + L_1 \Vert \nabla f(x) \Vert_*\big) r^2 + \frac{1}{3} L_1 L r^3,
+\end{align*}
+что совпадает с~\eqref{eq:func_no_exp}.
+\end{proof}
+
+\begin{remark}[Область применимости оценки~\eqref{eq:func_no_exp}]
+Утверждение~\ref{prop:no_exp_finite_L} показывает, что экспонента $\exp(L_1 r)$ заменяется кубическим слагаемым $\frac{1}{3} L_1 L r^3$. Однако при огромной глобальной константе $L$ (например, $L = 10^8$) произведение $L_1 L$ велико: оценка~\eqref{eq:func_no_exp} превосходит стандартную квадратичную границу $\frac{L}{2} r^2$ лишь при условии
+\[
+\frac{1}{2}\big(L_0 + L_1 \Vert \nabla f(x) \Vert_*\big) + \frac{1}{3} L_1 L r \le \frac{L}{2},
+\]
+то есть при достаточно малых шагах $r \lesssim \frac{1}{L_1}$. Таким образом, сама по себе конечность $L$ не отменяет необходимости локализации при больших расстояниях $r$.
+\end{remark}
+
+\subsection{Сдвинутая функция и глобальная $(L_0, L_1)$-кокоэрцитивность без экспоненты}
+
+Для выпуклой $L$-гладкой функции известно классическое свойство кокоэрцитивности: для любых $u, v$ выполнено $\Vert \nabla f(u) - \nabla f(v) \Vert_*^2 \le 2 L D_f(u, v)$, где
+\[
+D_f(u, v) := f(u) - f(v) - \langle \nabla f(v), u - v \rangle \ge 0
+\]
+--- дивергенция Брэгмана функции $f$. При $(L_0, L_1)$-гладкости глобальная кокоэрцитивность с постоянной $L$ неверна, однако с помощью специального выбора пробного шага (идея Леммы~2.2 из~\cite{Gorbunov2024}) можно получить \emph{глобальный} аналог кокоэрцитивности \emph{без экспоненты} и без ограничения на $\Vert u - x^* \Vert$, причём даже в случае вариационного неравенства, где $\nabla f(x^*) \neq 0$.
+
+\begin{lemma}[Глобальная $(L_0, L_1)$-кокоэрцитивность относительно опорной точки $x^*$]\label{lem:global_cocoercivity}
+Пусть $f : \mathbb{R}^d \to \mathbb{R}$ выпукла, глобально $L$-гладкая (допускается $L = +\infty$) и симметрично $(L_0, L_1)$-гладкая относительно евклидовой нормы $\Vert \cdot \Vert_2$. Зафиксируем произвольную точку $x^* \in \mathbb{R}^d$ и обозначим через $\nu \in (0, 1)$ единственный корень уравнения $\nu = e^{-\nu}$ ($\nu \approx 0.5671$). Определим для любого $u \in \mathbb{R}^d$:
+\begin{equation}\label{eq:ax_def}
+A_f(u) := \max\big\{L_0 + L_1 \Vert \nabla f(u) \Vert_2,\; L_1 \Vert \nabla f(u) - \nabla f(x^*) \Vert_2\big\}.
+\end{equation}
+Тогда для всех $u \in \mathbb{R}^d$ справедливо глобальное неравенство без экспоненты:
+\begin{equation}\label{eq:global_cocoercivity}
+\Vert \nabla f(u) - \nabla f(x^*) \Vert_2^2 \le 2 L_f^{\mathrm{loc}}(u)\, D_f(u, x^*), \qquad L_f^{\mathrm{loc}}(u) := \min\left\{L,\; \frac{A_f(u)}{\nu}\right\}.
+\end{equation}
+Кроме того, выполняется наблюдаемая оценка сверху:
+\begin{equation}\label{eq:ax_observable}
+A_f(u) \le L_0^{\mathrm{eff}} + L_1 \Vert \nabla f(u) \Vert_2, \qquad L_0^{\mathrm{eff}} := L_0 + L_1 \Vert \nabla f(x^*) \Vert_2.
+\end{equation}
+\end{lemma}
+
+\begin{proof}
+Если $\nabla f(u) = \nabla f(x^*)$, неравенство~\eqref{eq:global_cocoercivity} тривиально ($0 \le 0$). Пусть $\nabla f(u) \neq \nabla f(x^*)$, тогда $A_f(u) > 0$. Введём сдвинутую функцию
+\[
+\varphi(w) := f(w) - \langle \nabla f(x^*), w \rangle, \qquad w \in \mathbb{R}^d.
+\]
+Её градиент равен $\nabla \varphi(w) = \nabla f(w) - \nabla f(x^*)$, поэтому $\nabla \varphi(x^*) = 0$. В силу выпуклости $f$ функция $\varphi$ выпукла и достигает глобального минимума в точке $x^*$, причём разность значений в точках $u$ и $x^*$ в точности совпадает с дивергенцией Брэгмана:
+\[
+\varphi(u) - \varphi(x^*) = f(u) - f(x^*) - \langle \nabla f(x^*), u - x^* \rangle = D_f(u, x^*) \ge 0.
+\]
+Применим квадратичную верхнюю оценку~\eqref{eq:quad_upper_exp} из Леммы~\ref{lem:gronwall_l0l1} к функции $f$ в точке $u$ и произвольной точке $v \in \mathbb{R}^d$. Заметим, что $\varphi(v) - \varphi(u) - \langle \nabla \varphi(u), v - u \rangle = f(v) - f(u) - \langle \nabla f(u), v - u \rangle$, поэтому:
+\begin{equation}\label{eq:phi_upper_step}
+\varphi(v) \le \varphi(u) + \langle \nabla \varphi(u), v - u \rangle + \frac{L_0 + L_1 \Vert \nabla f(u) \Vert_2}{2} \exp\big(L_1 \Vert v - u \Vert_2\big) \Vert v - u \Vert_2^2.
+\end{equation}
+Выберем теперь специальный градиентный шаг из точки $u$:
+\[
+v := u - \frac{\nu}{A_f(u)} \nabla \varphi(u).
+\]
+Проверим два свойства этого выбора, вытекающие из определения~\eqref{eq:ax_def}:
+\begin{enumerate}
+    \item $L_1 \Vert v - u \Vert_2 = \frac{\nu L_1 \Vert \nabla f(u) - \nabla f(x^*) \Vert_2}{A_f(u)} \le \nu$, откуда $\exp\big(L_1 \Vert v - u \Vert_2\big) \le e^\nu = \frac{1}{\nu}$ по определению числа $\nu$;
+    \item $L_0 + L_1 \Vert \nabla f(u) \Vert_2 \le A_f(u)$.
+\end{enumerate}
+Подставляя $v$ в~\eqref{eq:phi_upper_step} и используя оба неравенства, а также глобальную минимальность $x^*$ для $\varphi$ ($\varphi(x^*) \le \varphi(v)$), получаем:
+\begin{align*}
+\varphi(x^*) \le \varphi(v) &\le \varphi(u) - \frac{\nu}{A_f(u)} \Vert \nabla \varphi(u) \Vert_2^2 + \frac{A_f(u)}{2} \cdot \frac{1}{\nu} \cdot \frac{\nu^2}{A_f(u)^2} \Vert \nabla \varphi(u) \Vert_2^2 \\
+&= \varphi(u) - \frac{\nu}{2 A_f(u)} \Vert \nabla \varphi(u) \Vert_2^2.
+\end{align*}
+Перенося $\varphi(x^*)$ в правую часть и умножая на $\frac{2 A_f(u)}{\nu}$, находим:
+\[
+\Vert \nabla f(u) - \nabla f(x^*) \Vert_2^2 = \Vert \nabla \varphi(u) \Vert_2^2 \le \frac{2 A_f(u)}{\nu} \big(\varphi(u) - \varphi(x^*)\big) = \frac{2 A_f(u)}{\nu} D_f(u, x^*).
+\]
+Если глобальная константа $L$ конечна, то стандартная $L$-кокоэрцитивность даёт $\Vert \nabla f(u) - \nabla f(x^*) \Vert_2^2 \le 2 L D_f(u, x^*)$. Объединяя обе оценки через минимум, получаем~\eqref{eq:global_cocoercivity}. Наконец, по неравенству треугольника $L_1 \Vert \nabla f(u) - \nabla f(x^*) \Vert_2 \le L_1 \Vert \nabla f(x^*) \Vert_2 + L_1 \Vert \nabla f(u) \Vert_2 \le L_0^{\mathrm{eff}} + L_1 \Vert \nabla f(u) \Vert_2$, что доказывает~\eqref{eq:ax_observable}.
+\end{proof}
+
+\begin{remark}[Роль эффективной константы $L_0^{\mathrm{eff}}$]\label{rem:l0_eff}
+В задаче минимизации $\nabla f(x^*) = 0$, поэтому $L_0^{\mathrm{eff}} = L_0$. В вариационном неравенстве или седловой задаче~\eqref{eq:saddle_problem} величина $\Vert \nabla f(x^*) \Vert_2 = \Vert B^\top y^* \Vert_2$ ненулевая, поэтому $L_0^{\mathrm{eff}} = L_0 + L_1 \Vert B^\top y^* \Vert_2$ играет роль истинного масштаба локальной кривизны функции $f$ в окрестности седловой точки.
+\end{remark}
+
+% ==============================================================================
+\section{Как устроена рекурсия Бородич и инвариантность $(L_0, L_1)$-гладкости}
+% ==============================================================================
+
+\subsection{Интуиция и механика рекурсивного слайдинга Бородич--Гасникова--Ковалёва}
+
+Чтобы читатель, не знакомый со статьёй~\cite{Borodich2025}, мог проследить все детали доказательств, опишем конструкцию \texttt{RecursiveProcedure} из Алгоритма~1 в~\cite{Borodich2025}.
+
+Сделаем замену переменных $z \mapsto P^{1/2} z$, чтобы без ограничения общности считать метрическую матрицу единичной: $P = I_d$, а норму $\Vert \cdot \Vert_P$ --- стандартной евклидовой нормой $\Vert \cdot \Vert_2$. Компоненты упорядочены по уровням $k = 1, 2, \dots, n$:
+\[
+p(z) = \sum_{i=1}^n p_i(z), \qquad Q(z) = \sum_{i=1}^n Q_i(z).
+\]
+На уровне $k \in \{1, \dots, n\}$ процедура выполняет $T_k$ внешних итераций $t_k = 0, 1, \dots, T_k - 1$ и работает с усечённой задачей, содержащей только компоненты с номерами $i \ge k$:
+\[
+p^k(z) = \sum_{i=k}^n p_i(z), \qquad Q^k(z) = \sum_{i=k}^n Q_i(z).
+\]
+На каждой итерации $t_k$ уровня $k$ происходят следующие шаги:
+\begin{enumerate}
+    \item \textbf{Усреднение Нестерова (строка 16 Алгоритма~1):} формируется промежуточная точка
+    \begin{equation}\label{eq:borodich_avg}
+    \bar{z}_{t_k}^k = \alpha_{t_k} z_{t_k}^k + (1 - \alpha_{t_k}) z_{t_k}^{\mathrm{ag}, k}, \qquad \alpha_{t_k} = \frac{2}{t_k + 2} \in (0, 1],
+    \end{equation}
+    где $z_{t_k}^k$ --- опорная (проксимальная) последовательность, а $z_{t_k}^{\mathrm{ag}, k}$ --- ускоренная (агрегированная) последовательность.
+    \item \textbf{Масштабирование подзадачи (строка 17 Алгоритма~1):} для всех компонент с индексами $i \ge k$ определяются сжатые (масштабированные) функции и операторы:
+    \begin{align}
+    \hat{p}_i^{k; t_1, \dots, t_k}(z) &:= \alpha_{t_k}^{-1} p_i^{k-1; t_1, \dots, t_{k-1}}\big(\alpha_{t_k} z + (1 - \alpha_{t_k}) \bar{z}_{t_k}^k\big), \label{eq:scaled_p} \\
+    \hat{Q}_i^{k; t_1, \dots, t_k}(z) &:= Q_i^{k-1; t_1, \dots, t_{k-1}}\big(\alpha_{t_k} z + (1 - \alpha_{t_k}) \bar{z}_{t_k}^k\big). \label{eq:scaled_Q}
+    \end{align}
+    Здесь на верхнем уровне $k = 1$ полагается $p_i^0 \equiv p_i$ и $Q_i^0 \equiv Q_i$.
+    \item \textbf{Сдвиг регуляризацией (строка 18 Алгоритма~1):} к текущей компоненте $k$ добавляется квадратичная проксимальная добавка с коэффициентом $H_k^{k; t_1, \dots, t_k} > 0$, а внутренние уровни $k+1, \dots, n$ вызываются рекурсивно для решения вспомогательного ВН на $T_{k+1}$ шагах, выдавая точку $z_{t_k + 1/2}^k$ и агрегированную точку $z_{t_k + 1}^{\mathrm{ag}, k}$. (На самом глубоком уровне $k = n$ рекурсия заканчивается, и $z_{t_n + 1/2}^n$ находится явным проксимально-градиентным шагом по паре $(p_n, Q_n)$.)
+    \item \textbf{Коррекция опорной точки (строка 27 Алгоритма~1):} используя разность операторов $\Delta_{Q_k}^{k; t_1, \dots, t_k} := \hat{Q}_k^k(z_{t_k}^k) - \hat{Q}_k^k(z_{t_k + 1/2}^k)$, алгоритм обновляет опорную точку:
+    \begin{equation}\label{eq:borodich_line27_orig}
+    z_{t_k + 1}^k = \operatorname{proj}_{\mathcal{C}_z}^P\Big(z_{t_k + 1/2}^k + \big(H_k^{k; t_1, \dots, t_k} P\big)^{-1} \Delta_{Q_k}^{k; t_1, \dots, t_k}\Big).
+    \end{equation}
+\end{enumerate}
+
+Почему это даёт разделение сложностей? На уровне $k$ константа гладкости функции $\hat{p}_k^k$ умножается на $\alpha_{t_k} \sim \frac{2}{t_k + 2}$. В сумме по $t_k = 0, \dots, T_k - 1$ накопленный масштаб растёт как $T_k^2$, что позволяет выбрать число шагов уровня $k$ пропорциональным $\sqrt{L_k}$ (а не $\sqrt{L_{\max}}$), причём на каждый шаг уровня $k$ оракул $\nabla p_k$ вызывается всего \emph{один} раз, а более глубокие уровни вызываются уже с ослабленной на $\alpha_{t_k}$ гладкостью!
+
+\subsection{Инвариантность $(L_0, L_1)$-гладкости при рекурсивном масштабировании}
+
+Первое ключевое наблюдение состоит в том, что преобразование масштабирования~\eqref{eq:scaled_p} сохраняет структуру $(L_0, L_1)$-гладкости и умножает \emph{обе} константы $(L_{0,i}, L_{1,i})$ на точный множитель $\Pi_k := \prod_{l=1}^k \alpha_{t_l}$, полностью аналогично тому, как в классическом случае на $\Pi_k$ умножается константа $L_i$.
+
+\begin{lemma}[Масштабирование $(L_0, L_1)$-гладкости в рекурсии Бородич]\label{lem:scaling_invariance}
+Пусть компонента $p_i : \mathcal{X} \to \mathbb{R}$ выпукла и симметрично $(L_{0,i}, L_{1,i})$-гладкая в норме $\Vert \cdot \Vert_2$. Зафиксируем последовательность весов $\alpha_{t_1}, \dots, \alpha_{t_k} \in (0, 1]$ и опорных точек $\bar{z}_{t_1}^1, \dots, \bar{z}_{t_k}^k \in \mathcal{X}$ (где $\mathcal{X}$ выпукло). Определим рекурсивно для $l = 1, \dots, k$:
+\[
+p_i^{0}(z) := p_i(z), \qquad \hat{p}_i^{l; t_1, \dots, t_l}(z) := \alpha_{t_l}^{-1} p_i^{l-1; t_1, \dots, t_{l-1}}\big(\alpha_{t_l} z + (1 - \alpha_{t_l}) \bar{z}_{t_l}^l\big),
+\]
+где переход от $\hat{p}_i^{l}$ к $p_i^{l}$ отличается лишь добавлением квадратичного слагаемого для индекса $i = l$ и не меняет компоненты с $i > l$. Тогда для любого $i \ge k$ и любого $z \in \mathcal{X}$:
+\begin{enumerate}
+    \item аргумент исходной функции представим в виде выпуклой комбинации
+    \begin{equation}\label{eq:convex_comb_tilde}
+    \tilde{z}_i^k(z) = \Pi_k z + \sum_{l=1}^k \gamma_l \bar{z}_{t_l}^l \in \mathcal{X}, \qquad \Pi_k := \prod_{l=1}^k \alpha_{t_l}, \quad \gamma_l := (1 - \alpha_{t_l}) \prod_{m=l+1}^k \alpha_{t_m} \ge 0, \quad \Pi_k + \sum_{l=1}^k \gamma_l = 1;
+    \end{equation}
+    \item градиент масштабированной функции совпадает с градиентом $p_i$ в точке $\tilde{z}_i^k(z)$:
+    \begin{equation}\label{eq:grad_chain_rule}
+    \nabla \hat{p}_i^{k; t_1, \dots, t_k}(z) = \nabla p_i\big(\tilde{z}_i^k(z)\big);
+    \end{equation}
+    \item функция $\hat{p}_i^{k; t_1, \dots, t_k}$ выпукла на $\mathcal{X}$ и симметрично $(\Pi_k L_{0,i},\, \Pi_k L_{1,i})$-гладкая: для всех $x, y \in \mathcal{X}$ выполнено
+    \begin{equation}\label{eq:scaled_l0l1}
+    \Vert \nabla \hat{p}_i^{k; t_1, \dots, t_k}(x) - \nabla \hat{p}_i^{k; t_1, \dots, t_k}(y) \Vert_2 \le \left(\Pi_k L_{0,i} + \Pi_k L_{1,i} \sup_{u \in [x, y]} \Vert \nabla \hat{p}_i^{k; t_1, \dots, t_k}(u) \Vert_2\right) \Vert x - y \Vert_2.
+    \end{equation}
+\end{enumerate}
+\end{lemma}
+
+\begin{proof}
+Докажем пункты~1 и~2 индукцией по глубине рекурсии $k \ge 1$.
+
+\emph{База индукции ($k = 1$).} По определению~\eqref{eq:scaled_p}, $\hat{p}_i^{1; t_1}(z) = \alpha_{t_1}^{-1} p_i(\alpha_{t_1} z + (1 - \alpha_{t_1})\bar{z}_{t_1}^1)$. Здесь $\tilde{z}_i^1(z) = \alpha_{t_1} z + (1 - \alpha_{t_1})\bar{z}_{t_1}^1$, коэффициенты $\Pi_1 = \alpha_{t_1} \ge 0$ и $\gamma_1 = 1 - \alpha_{t_1} \ge 0$ дают в сумме $1$, поэтому $\tilde{z}_i^1(z) \in \mathcal{X}$ в силу выпуклости $\mathcal{X}$. Дифференцируя по правилу сложной функции, получаем
+\[
+\nabla \hat{p}_i^{1; t_1}(z) = \alpha_{t_1}^{-1} \cdot \alpha_{t_1} \nabla p_i\big(\alpha_{t_1} z + (1 - \alpha_{t_1})\bar{z}_{t_1}^1\big) = \nabla p_i\big(\tilde{z}_i^1(z)\big).
+\]
+
+\emph{Шаг индукции ($k - 1 \to k$, где $i \ge k$).} Поскольку $i \ge k > k - 1$, на уровне $k - 1$ к компоненте $i$ квадратичная регуляризация не добавлялась, поэтому $p_i^{k-1; t_1, \dots, t_{k-1}} \equiv \hat{p}_i^{k-1; t_1, \dots, t_{k-1}}$. По предположению индукции $\nabla p_i^{k-1}(w) = \nabla p_i(\tilde{z}_i^{k-1}(w))$ с $\tilde{z}_i^{k-1}(w) = \Pi_{k-1} w + \sum_{l=1}^{k-1} \tilde{\gamma}_l \bar{z}_{t_l}^l$. Подставляя $w = \alpha_{t_k} z + (1 - \alpha_{t_k})\bar{z}_{t_k}^k$, получаем
+\begin{align*}
+\tilde{z}_i^k(z) &= \Pi_{k-1}\big(\alpha_{t_k} z + (1 - \alpha_{t_k})\bar{z}_{t_k}^k\big) + \sum_{l=1}^{k-1} \tilde{\gamma}_l \bar{z}_{t_l}^l \\
+&= \Pi_k z + \Pi_{k-1}(1 - \alpha_{t_k})\bar{z}_{t_k}^k + \sum_{l=1}^{k-1} \tilde{\gamma}_l \bar{z}_{t_l}^l.
+\end{align*}
+Сумма всех коэффициентов при $z$ и $\bar{z}_{t_l}^l$ равна $\Pi_{k-1}(\alpha_{t_k} + 1 - \alpha_{t_k}) + \sum_{l=1}^{k-1} \tilde{\gamma}_l = \Pi_{k-1} + \sum_{l=1}^{k-1} \tilde{\gamma}_l = 1$, а все коэффициенты неотрицательны. Дифференцирование по $z$ снова сокращает $\alpha_{t_k}^{-1}$ и $\alpha_{t_k}$:
+\[
+\nabla \hat{p}_i^{k; t_1, \dots, t_k}(z) = \alpha_{t_k}^{-1} \cdot \alpha_{t_k} \nabla p_i^{k-1}\big(\alpha_{t_k} z + (1 - \alpha_{t_k})\bar{z}_{t_k}^k\big) = \nabla p_i\big(\tilde{z}_i^k(z)\big).
+\]
+
+\emph{Доказательство пункта~3.} Выпуклость $\hat{p}_i^k$ следует из того, что она получена композицией выпуклой функции $p_i$ с аффинным отображением и умножением на положительное число $\Pi_k^{-1}$. Возьмём любые $x, y \in \mathcal{X}$. Заметим, что аффинное отображение $u \mapsto \tilde{z}_i^k(u)$ переводит отрезок $[x, y]$ в отрезок $[\tilde{z}_i^k(x), \tilde{z}_i^k(y)] \subseteq \mathcal{X}$, причём
+\[
+\Vert \tilde{z}_i^k(x) - \tilde{z}_i^k(y) \Vert_2 = \Vert \Pi_k (x - y) \Vert_2 = \Pi_k \Vert x - y \Vert_2.
+\]
+Применяя~\eqref{eq:grad_chain_rule} и симметричную $(L_{0,i}, L_{1,i})$-гладкость исходной функции $p_i$ к паре точек $\tilde{z}_i^k(x), \tilde{z}_i^k(y) \in \mathcal{X}$, находим:
+\begin{align*}
+\Vert \nabla \hat{p}_i^k(x) - \nabla \hat{p}_i^k(y) \Vert_2 &= \Vert \nabla p_i(\tilde{z}_i^k(x)) - \nabla p_i(\tilde{z}_i^k(y)) \Vert_2 \\
+&\le \left(L_{0,i} + L_{1,i} \sup_{\xi \in [\tilde{z}_i^k(x), \tilde{z}_i^k(y)]} \Vert \nabla p_i(\xi) \Vert_2\right) \Vert \tilde{z}_i^k(x) - \tilde{z}_i^k(y) \Vert_2 \\
+&= \left(\Pi_k L_{0,i} + \Pi_k L_{1,i} \sup_{u \in [x, y]} \Vert \nabla p_i(\tilde{z}_i^k(u)) \Vert_2\right) \Vert x - y \Vert_2 \\
+&= \left(\Pi_k L_{0,i} + \Pi_k L_{1,i} \sup_{u \in [x, y]} \Vert \nabla \hat{p}_i^k(u) \Vert_2\right) \Vert x - y \Vert_2,
+\end{align*}
+что и требовалось доказать.
+\end{proof}
+
+\begin{corollary}[Квадратичная верхняя оценка на уровне $k$]\label{cor:level_k_quad}
+Применяя Лемму~\ref{lem:gronwall_l0l1} к функции $\hat{p}_k^{k; t_1, \dots, t_k}$ на паре точек $z_{t_k}^k, z_{t_k + 1/2}^k \in \mathcal{X}$, получаем квадратичную верхнюю оценку с константой
+\begin{equation}\label{eq:tilde_L_k}
+\widetilde{L}_k^{k; t_1, \dots, t_k} := \Pi_k \cdot \min\Big\{L_k,\; \big(L_{0,k} + L_{1,k} \Vert \nabla \hat{p}_k^k(z_{t_k}^k) \Vert_2\big) \exp\big(\Pi_k L_{1,k} \Vert z_{t_k + 1/2}^k - z_{t_k}^k \Vert_2\big)\Big\}.
+\end{equation}
+\end{corollary}
+
+% ==============================================================================
+\section{Вариант А: прямой перенос алгоритма Бородич на произвольное $n \ge 2$ через локализацию на шаре $D$}
+% ==============================================================================
+
+В~\cite{Borodich2025} параметры $H_k^{k; t_1, \dots, t_k}$ в строке~18 алгоритма фиксируются заранее до начала вычислений через глобальные константы гладкости $L_1, \dots, L_n$. Чтобы сохранить этот механизм без изменения алгебры весов $\alpha_{t_k}$ для любого числа компонент $n \ge 2$, достаточно удержать траекторию внутри ограниченного шара вокруг точки старта $z_{\mathrm{in}}$, где $(L_{0,i}, L_{1,i})$-гладкие функции обладают конечными локальными константами Липшица градиента.
+
+\subsection{Описание локализованного Алгоритма 1 (Вариант А)}
+
+Пусть $z_{\mathrm{in}} \in \mathcal{C}$ --- начальная точка, а $D > 0$ --- известный верхний радиус, такой что решение $z^*$ принадлежит замкнутому $P$-шару
+\[
+\overline{B}_D^P(z_{\mathrm{in}}) := \big\{z \in \mathbb{R}^d : \Vert z - z_{\mathrm{in}} \Vert_P \le D\big\}.
+\]
+(Как правило, величина $D = \mathcal{O}(\Vert z_{\mathrm{in}} - z^* \Vert_P)$ выбирается так же, как в разделе~5.2 статьи~\cite{Borodich2025}.) В Алгоритм~1 работы~\cite{Borodich2025} вносятся ровно \textbf{три точечные модификации}:
+
+\begin{center}
+\begin{tabularx}{\textwidth}{l X}
+\toprule
+\textbf{Место в Алгоритме~1} & \textbf{Модификация (Вариант А)} \\
+\midrule
+\textbf{1. Строка 12 (область):} & Определить локализованное выпуклое замкнутое множество $\widetilde{\mathcal{C}}_z := \mathcal{C}_z \cap \overline{B}_D^P(z_{\mathrm{in}})$ (в обозначениях без нормировки $P = I_d$: $\widetilde{\mathcal{C}} := \mathcal{C} \cap \overline{B}_D(z_{\mathrm{in}})$). \\
+\addlinespace
+\textbf{2. Строка 18 (константы):} & Вместо глобальных $L_i$ подставить локальные оценки гладкости на шаре $\overline{B}_D^P(z_{\mathrm{in}})$:
+\[
+\widehat{L}_i(D) := \min\Big\{L_i,\; \big(L_{0,i} + L_{1,i} \Vert \nabla p_i(z_{\mathrm{in}}) \Vert_{P^{-1}}\big) \exp(c_P L_{1,i} D)\Big\},
+\]
+где $c_P > 0$ --- константа эквивалентности норм ($\Vert u \Vert \le c_P \Vert u \Vert_P$; при $P = I_d$ имеем $c_P = 1$). \\
+\addlinespace
+\textbf{3. Строка 27 (проекция):} & Заменить проекцию на $\mathcal{C}_z$ проекцией на локализованное множество $\widetilde{\mathcal{C}}_z$:
+\[
+z_{t_1, \dots, t_{k-1}, t_k + 1}^k = \operatorname{proj}_{\widetilde{\mathcal{C}}_z}^P\Big(z_{t_1, \dots, t_{k-1}, t_k + 1/2}^k + \big(H_k^{k; t_1, \dots, t_k} P\big)^{-1} \Delta_{Q_k}^{k; t_1, \dots, t_k}\Big).
+\]
+\\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+\subsection{Полное пошаговое доказательство корректности Варианта А}
+
+Покажем, что при указанных трёх правках все звенья доказательства из Приложения~K работы~\cite{Borodich2025} (Леммы~K.1, K.4, K.5, Теорема~4.5 и Следствие~4.6) проходят без единого пробела.
+
+\begin{lemma}[Локальная липшицева гладкость компонент на шаре $D$]\label{lem:local_L_on_ball}
+Пусть $p_i$ выпукла, глобально $L_i$-гладкая (допускается $L_i = +\infty$) и симметрично $(L_{0,i}, L_{1,i})$-гладкая в норме $\Vert \cdot \Vert$ (с сопряжённой нормой $\Vert \cdot \Vert_*$), а норма $\Vert \cdot \Vert_P$ связана с $\Vert \cdot \Vert$ соотношением $\Vert u \Vert \le c_P \Vert u \Vert_P$ для всех $u \in \mathbb{R}^d$. Тогда на шаре $\overline{B}_D^P(z_{\mathrm{in}})$ функция $p_i$ является классически $\widehat{L}_i(D)$-гладкой, где
+\begin{equation}\label{eq:hat_Li_D}
+\widehat{L}_i(D) := \min\Big\{L_i,\; \big(L_{0,i} + L_{1,i} \Vert \nabla p_i(z_{\mathrm{in}}) \Vert_*\big) \exp(c_P L_{1,i} D)\Big\}.
+\end{equation}
+\end{lemma}
+
+\begin{proof}
+Возьмём произвольные точки $x, y \in \overline{B}_D^P(z_{\mathrm{in}})$ и произвольную точку $\xi \in [x, y]$. Поскольку шар $\overline{B}_D^P(z_{\mathrm{in}})$ выпуклый, точка $\xi$ также лежит в $\overline{B}_D^P(z_{\mathrm{in}})$, следовательно:
+\[
+\Vert \xi - z_{\mathrm{in}} \Vert \le c_P \Vert \xi - z_{\mathrm{in}} \Vert_P \le c_P D.
+\]
+Применяя неравенство~\eqref{eq:grad_exp_bound} из Леммы~\ref{lem:gronwall_l0l1} к паре точек $(z_{\mathrm{in}}, \xi)$, находим равномерную верхнюю границу для всех $\xi \in [x, y]$:
+\[
+L_{0,i} + L_{1,i} \Vert \nabla p_i(\xi) \Vert_* \le \big(L_{0,i} + L_{1,i} \Vert \nabla p_i(z_{\mathrm{in}}) \Vert_*\big) \exp\big(L_{1,i} \Vert \xi - z_{\mathrm{in}} \Vert\big) \le \big(L_{0,i} + L_{1,i} \Vert \nabla p_i(z_{\mathrm{in}}) \Vert_*\big) \exp(c_P L_{1,i} D).
+\]
+Подставляя эту равномерную оценку в определение~\eqref{eq:def_l0l1} симметричной $(L_{0,i}, L_{1,i})$-гладкости, получаем для любых $x, y \in \overline{B}_D^P(z_{\mathrm{in}})$:
+\[
+\Vert \nabla p_i(x) - \nabla p_i(y) \Vert_* \le \big(L_{0,i} + L_{1,i} \Vert \nabla p_i(z_{\mathrm{in}}) \Vert_*\big) \exp(c_P L_{1,i} D) \, \Vert x - y \Vert.
+\]
+Так как неравенство $\Vert \nabla p_i(x) - \nabla p_i(y) \Vert_* \le L_i \Vert x - y \Vert$ также выполнено для всех $x, y \in \overline{B}_D^P(z_{\mathrm{in}})$, взятие минимума по двум верхним оценкам завершает доказательство.
+\end{proof}
+
+\begin{remark}[Формула через градиент в точке решения $z^*$]
+Если вместо $\Vert \nabla p_i(z_{\mathrm{in}}) \Vert_*$ удобнее выразить константу через решение $z^* \in \overline{B}_D^P(z_{\mathrm{in}})$, то оценка~\eqref{eq:grad_exp_bound} на паре $(z^*, z_{\mathrm{in}})$ даёт $L_{0,i} + L_{1,i}\Vert \nabla p_i(z_{\mathrm{in}}) \Vert_* \le (L_{0,i} + L_{1,i}\Vert \nabla p_i(z^*) \Vert_*) \exp(c_P L_{1,i} D)$, откуда
+\[
+\widehat{L}_i(D) \le \min\Big\{L_i,\; \big(L_{0,i} + L_{1,i} \Vert \nabla p_i(z^*) \Vert_*\big) \exp(2 c_P L_{1,i} D)\Big\}.
+\]
+\end{remark}
+
+\begin{lemma}[Инвариантность множества $\widetilde{\mathcal{C}}_z$ для всех точек и аргументов оракулов]\label{lem:invariance_Cz}
+В локализованном Алгоритме~1 (Вариант~А) все порождаемые точки на всех уровнях рекурсии $k = 1, \dots, n$ --- а именно $z_{t_k}^k$, $\bar{z}_{t_k}^k$, $z_{t_k + 1/2}^k$, $z_{t_k + 1}^{\mathrm{ag}, k}$, обновлённые точки $z_{t_k + 1}^k$ из строки~27, а также все аргументы $\tilde{z}_i^k$, в которых вызываются оракулы $\nabla p_i$ и $Q_i$, --- принадлежат выпуклому замкнутому множеству $\widetilde{\mathcal{C}}_z = \mathcal{C}_z \cap \overline{B}_D^P(z_{\mathrm{in}})$.
+\end{lemma}
+
+\begin{proof}
+Множество $\widetilde{\mathcal{C}}_z = \mathcal{C}_z \cap \overline{B}_D^P(z_{\mathrm{in}})$ непусто (содержит $z_{\mathrm{in}}$ и $z^*$), выпукло и замкнуто как пересечение двух выпуклых замкнутых множеств. Докажем принадлежность всех точек множеству $\widetilde{\mathcal{C}}_z$ индукцией по порядку их вычисления в алгоритме:
+\begin{enumerate}
+    \item Начальная точка $z_{\mathrm{in}} \in \widetilde{\mathcal{C}}_z$. На каждом уровне $k$ инициализация копирует точки с предыдущего уровня или из $z_{\mathrm{in}}$, поэтому стартовые точки уровня $z_0^k, z_0^{\mathrm{ag}, k} \in \widetilde{\mathcal{C}}_z$.
+    \item Точка $\bar{z}_{t_k}^k = \alpha_{t_k} z_{t_k}^k + (1 - \alpha_{t_k}) z_{t_k}^{\mathrm{ag}, k}$ при $\alpha_{t_k} \in (0, 1]$ является выпуклой комбинацией двух точек из $\widetilde{\mathcal{C}}_z$, следовательно, $\bar{z}_{t_k}^k \in \widetilde{\mathcal{C}}_z$.
+    \item Точка $z_{t_k + 1/2}^k$ вычисляется либо как выход рекурсивного вызова уровня $k + 1$ (при $k < n$), который по предположению индукции по глубине принадлежит $\widetilde{\mathcal{C}}_z$, либо на базовом уровне $k = n$ как решение проксимально-градиентного подшага по множеству $\widetilde{\mathcal{C}}_z$, что также гарантирует $z_{t_n + 1/2}^n \in \widetilde{\mathcal{C}}_z$.
+    \item Агрегированная точка $z_{t_k + 1}^{\mathrm{ag}, k} = \alpha_{t_k} z_{t_k + 1/2}^k + (1 - \alpha_{t_k}) z_{t_k}^{\mathrm{ag}, k}$ является выпуклой комбинацией точек из $\widetilde{\mathcal{C}}_z$, поэтому $z_{t_k + 1}^{\mathrm{ag}, k} \in \widetilde{\mathcal{C}}_z$.
+    \item Обновлённая точка $z_{t_k + 1}^k$ в строке~27 получена оператором метрической проекции $\operatorname{proj}_{\widetilde{\mathcal{C}}_z}^P(\cdot)$ на множество $\widetilde{\mathcal{C}}_z$, поэтому по определению проекции $z_{t_k + 1}^k \in \widetilde{\mathcal{C}}_z$.
+    \item Наконец, по пункту~1 Леммы~\ref{lem:scaling_invariance} всякий вызов оракула $\nabla \hat{p}_i^k(w)$ или $\hat{Q}_i^k(w)$ в точке $w \in \widetilde{\mathcal{C}}_z$ сводится к вызову исходных оракулов $\nabla p_i$ и $Q_i$ в точке $\tilde{z}_i^k(w)$, являющейся выпуклой комбинацией $w \in \widetilde{\mathcal{C}}_z$ и точек $\bar{z}_{t_1}^1, \dots, \bar{z}_{t_k}^k \in \widetilde{\mathcal{C}}_z$. В силу выпуклости $\widetilde{\mathcal{C}}_z$ имеем $\tilde{z}_i^k(w) \in \widetilde{\mathcal{C}}_z$.
+\end{enumerate}
+Индукция завершена.
+\end{proof}
+
+\begin{theorem}[Перенос Леммы K.4, Теоремы 4.5 и Следствия 4.6 на произвольное $n \ge 2$]\label{thm:variant_A}
+Пусть выполнены стандартные предположения монотонного ВН~\eqref{eq:vi_main}--\eqref{eq:sum_structure} с $z^* \in \overline{B}_D^P(z_{\mathrm{in}})$, каждая функция $p_i$ выпукла, симметрично $(L_{0,i}, L_{1,i})$-гладкая и глобально $L_i$-гладкая (допускается $L_i = +\infty$), а каждый оператор $Q_i$ монотонен и $M_i$-липшицев. Тогда для локализованного Алгоритма~1 (Вариант~А) при любом $n \ge 2$:
+\begin{enumerate}
+    \item ключевое рекурсивное неравенство Леммы~K.4 из~\cite{Borodich2025} выполняется дословно с заменой множества $\mathcal{C}_z$ на $\widetilde{\mathcal{C}}_z$ и констант $L_i$ на $\widehat{L}_i(D)$;
+    \item для произвольной точности $\epsilon > 0$ алгоритм находит точку $z_{\mathrm{out}} \in \widetilde{\mathcal{C}}_z$, удовлетворяющую
+    \begin{equation}\label{eq:variant_A_gap}
+    \langle Q(\hat{z}), z_{\mathrm{out}} - \hat{z} \rangle + p(z_{\mathrm{out}}) - p(\hat{z}) \le \frac{\epsilon}{2} \Vert \hat{z} - z_{\mathrm{in}} \Vert_P^2 \qquad \forall \hat{z} \in \widetilde{\mathcal{C}}_z,
+    \end{equation}
+    используя для каждой пары компонент $i = 1, \dots, n$ не более
+    \begin{equation}\label{eq:variant_A_complexity}
+    N(\nabla p_i),\; N(Q_i) = \mathcal{O}\!\left(6^n \max\left\{\sqrt{\frac{\widehat{L}_i(D)}{\epsilon}},\; \frac{M_i}{\epsilon},\; 1\right\}\right)
+    \end{equation}
+    вызовов оракулов $\nabla p_i$ и $Q_i$.
+\end{enumerate}
+\end{theorem}
+
+\begin{proof}
+Покажем пошагово, почему доказательство из Приложения~K работы~\cite{Borodich2025} полностью переносится при наших трёх модификациях.
+
+\emph{Шаг 1: Сведение к классической $\widehat{L}_i(D)$-гладкости на $\widetilde{\mathcal{C}}_z$.} По Лемме~\ref{lem:invariance_Cz} все точки алгоритма и все аргументы $\tilde{z}_i^k$ вызовов $\nabla p_i$ лежат внутри множества $\widetilde{\mathcal{C}}_z \subseteq \overline{B}_D^P(z_{\mathrm{in}})$. По Лемме~\ref{lem:local_L_on_ball} на множестве $\widetilde{\mathcal{C}}_z$ каждая функция $p_i$ обладает классической липшицевой гладкостью с константой $\widehat{L}_i(D)$. А по Лемме~\ref{lem:scaling_invariance} масштабированная функция $\hat{p}_i^{k; t_1, \dots, t_k}$ на уровне $k$ обладает классической гладкостью с константой $\Pi_k \widehat{L}_i(D)$. Следовательно, выбор параметров регуляризации $H_k^{k; t_1, \dots, t_k}$ по формулам строки~18 с подстановкой $\widehat{L}_i(D)$ вместо $L_i$ обеспечивает выполнение всех квадратичных верхних оценок на шагах (a)--(e) доказательства Леммы~K.4.
+
+\emph{Шаг 2: Проверка вариационного неравенства при проекции в строке~27 (шаги (f)--(g) Леммы~K.4).} Обозначим для краткости $z := z_{t_k}^k$, $z_{1/2} := z_{t_k + 1/2}^k$, $z^+ := z_{t_k + 1}^k$, $H := H_k^{k; t_1, \dots, t_k}$ и $\Delta_Q := \Delta_{Q_k}^{k; t_1, \dots, t_k}$. В строке~27 точка $z^+$ определяется как $P$-проекция вектора
+\[
+u := z_{1/2} + (H P)^{-1} \Delta_Q
+\]
+на выпуклое замкнутое множество $\widetilde{\mathcal{C}}_z$. По характеристическому свойству метрической проекции на выпуклое множество в скалярном произведении $\langle a, b \rangle_P := \langle P a, b \rangle$, для любой опорной точки $\hat{z} \in \widetilde{\mathcal{C}}_z$ выполняется неравенство оптимальности:
+\[
+\langle u - z^+, \hat{z} - z^+ \rangle_P \le 0.
+\]
+Подставляя выражение для $u$, расписываем это неравенство:
+\[
+\langle P(z_{1/2} - z^+) + \Delta_Q,\, \hat{z} - z^+ \rangle \le 0 \quad \Longleftrightarrow \quad \langle \Delta_Q, z^+ - \hat{z} \rangle \ge \langle P(z_{1/2} - z^+), \hat{z} - z^+ \rangle.
+\]
+Применяя трёхточечное тождество квадратов норм
+\[
+2 \langle P(z_{1/2} - z^+), \hat{z} - z^+ \rangle = \Vert z_{1/2} - z^+ \Vert_P^2 + \Vert \hat{z} - z^+ \Vert_P^2 - \Vert z_{1/2} - \hat{z} \Vert_P^2,
+\]
+получаем точную границу:
+\begin{equation}\label{eq:proj_three_point}
+\langle \Delta_Q, z^+ - \hat{z} \rangle \ge \frac{H}{2}\Vert z_{1/2} - z^+ \Vert_P^2 + \frac{H}{2}\Vert z^+ - \hat{z} \Vert_P^2 - \frac{H}{2}\Vert z_{1/2} - \hat{z} \Vert_P^2.
+\end{equation}
+Далее заметим, что по неравенству Коши--Буняковского и $M_k$-липшицевости $\hat{Q}_k^k$ (с учётом масштабирования):
+\[
+\langle \Delta_Q, z_{1/2} - z^+ \rangle \le \Vert \Delta_Q \Vert_{P^{-1}} \Vert z_{1/2} - z^+ \Vert_P \le \frac{1}{2H}\Vert \Delta_Q \Vert_{P^{-1}}^2 + \frac{H}{2}\Vert z_{1/2} - z^+ \Vert_P^2.
+\]
+Вычитая это неравенство из~\eqref{eq:proj_three_point}, получаем в точности ключевое соотношение шагов (f)--(g) Леммы~K.4:
+\[
+\langle \Delta_Q, z_{1/2} - \hat{z} \rangle \ge \frac{H}{2}\Vert z^+ - \hat{z} \Vert_P^2 - \frac{H}{2}\Vert z_{1/2} - \hat{z} \Vert_P^2 - \frac{1}{2H}\Vert \Delta_Q \Vert_{P^{-1}}^2.
+\]
+Вся остальная алгебра телескопирования по $t_k = 0, \dots, T_k - 1$ и индукция по глубине рекурсии $k = n, n-1, \dots, 1$ в Лемме~K.4 опираются только на это неравенство и $\widehat{L}_i(D)$-гладкость компонент, поэтому проходят без каких-либо изменений и приводят к~\eqref{eq:variant_A_gap} и~\eqref{eq:variant_A_complexity}.
+\end{proof}
+
+\subsection{Анализ выигрыша и граница применимости Варианта А}
+
+Теорема~\ref{thm:variant_A} представляет собой прямой многокомпонентный аналог ускоренного метода с $(L_0, L_1)$-гладкостью (Теорема~5.1 в~\cite{Gorbunov2024}). Оценим, какой выигрыш она даёт и где упирается в предел:
+\begin{itemize}
+    \item \textbf{Величина выигрыша:} поскольку $\widehat{L}_i(D)$ стоит под квадратным корнем в~\eqref{eq:variant_A_complexity}, уменьшение эффективной константы гладкости в $K$ раз сокращает число градиентных вызовов $\nabla p_i$ в $\sqrt{K}$ раз. Если $L_i = 10^8$, а на рабочей области радиуса $D$ выполнено $c_P L_{1,i} D \le 1$ и $\widehat{L}_i(D) \approx 10^2$, сложность уменьшается в $10^3$ раз.
+    \item \textbf{Граница применимости (далёкий старт):} в оценке~\eqref{eq:hat_Li_D} присутствует множитель $\exp(c_P L_{1,i} D)$. Если начальная точка расположена далеко от решения ($c_P L_{1,i} D \gg 1$), экспонента пробивает потолок $L_i$, и константа $\widehat{L}_i(D)$ деградирует до глобальной $L_i$ (а при $L_i = +\infty$ --- растёт экспоненциально по $D$).
+\end{itemize}
+
+% ==============================================================================
+\section{Неустранимость экспоненты при одном проходе и двухфазная схема (Вариант Б)}
+% ==============================================================================
+
+Прежде чем строить двухфазный алгоритм, покажем строго, почему \emph{любой} однофазный алгоритм, использующий фиксированную на весь глобальный проход оценку кривизны $\Lambda$ из далекой стартовой точки $r_* = \Vert z_0 - z^* \Vert_2 \gg 1/L_1$, неизбежно сталкивается с экспоненциальным множителем $\exp(L_1 r_*)$.
+
+\subsection{Нижняя оценка на константу гладкости первого глобального прохода}
+
+\begin{proposition}[Неустранимость экспоненты на глобальном шаге]\label{prop:exp_barrier}
+Рассмотрим одномерную задачу без оператора связи ($n = 1$, $Q \equiv 0$, $\mathcal{C} = \mathbb{R}$) для функции $p(x) = e^{L_1 x} - L_1 x$ ($L_1 > 0$), единственный минимум которой находится в точке $x^* = 0$. Эта функция симметрично $(L_0, L_1)$-гладкая с параметрами $L_0 = L_1^2$ и $L_1$. Пусть алгоритм начинает в точке $x_0 = r_* > 0$ и делает шаг к решению (или проверяет верхнюю квадратичную модель на отрезке, соединяющем $x_0$ с окрестностью решения $x^* = 0$). Тогда любая константа $\Lambda > 0$, обеспечивающая корректность квадратичной верхней оценки
+\[
+p(x_0) - p(x^*) - p'(x^*)(x_0 - x^*) \le \frac{\Lambda}{2}(x_0 - x^*)^2,
+\]
+удовлетворяет экспоненциальной нижней оценке
+\begin{equation}\label{eq:exp_lower_bound}
+\Lambda \ge \frac{2\big(e^{L_1 r_*} - 1 - L_1 r_*\big)}{r_*^2} \sim \frac{2 e^{L_1 r_*}}{r_*^2} \qquad \text{при } L_1 r_* \to \infty.
+\end{equation}
+Аналогично, если секущая проверяется в точке $x_0 = r_*$ на малом шаге вправо, $p''(r_*) = L_1^2 e^{L_1 r_*}$.
+\end{proposition}
+
+\begin{proof}
+Поскольку $p(0) = 1$ и $p'(0) = 0$, левая часть квадратичного неравенства равна $p(r_*) - p(0) = e^{L_1 r_*} - L_1 r_* - 1$. Деление на $\frac{1}{2} r_*^2$ немедленно даёт~\eqref{eq:exp_lower_bound}.
+\end{proof}
+
+Именно это явление наблюдали и авторы недавней работы~\cite{Dvinskikh2026} (\emph{Localize, Restart, Accelerate}, сентябрь 2026): ускоренные методы с глобальной моделью гладкости несут экспоненту от начального расстояния до тех пор, пока траектория не будет локализована в шаре радиуса $\mathcal{O}(1/L_1)$.
+
+\subsection{Вариант Б: двухфазный алгоритм для сильно монотонных ВН ($n \ge 1$)}
+
+Предположим теперь, что функция $p$ является $\mu$-сильно выпуклой ($\mu > 0$) в норме $\Vert \cdot \Vert_P$ (что обеспечивает $\mu$-сильную монотонность суммарного оператора $F(z) = \nabla p(z) + Q(z)$). Сделаем замену переменных $z \mapsto P^{1/2} z$, перейдя к стандартной евклидовой норме $\Vert \cdot \Vert_2$.
+
+Чтобы полностью убрать как огромную глобальную $L_i$, так и экспоненту $\exp(L_{1,i} R_0)$ из множителя при $\log(1/\rho)$ (и даже из аддитивной части сложности), объединим два механизма:
+\begin{itemize}
+    \item \textbf{Фаза 1 (Burn-in / локализация):} неускоренный $(L_0, L_1)$-экстраградиент для суммарного оператора $F(z) = \sum_{i=1}^n (\nabla p_i(z) + Q_i(z))$, который монотонно сжимает расстояние $\Vert z^k - z^* \Vert_2$ и заводит траекторию в малый шар радиуса
+    \[
+    r := \frac{1}{2 L_{1,\max}}, \qquad L_{1,\max} := \max_{1 \le i \le n} L_{1,i},
+    \]
+    за полиномиальное по $L_1 R_0$ число шагов \emph{без использования глобальной $L$ и без экспоненты $\exp(L_1 R_0)$};
+    \item \textbf{Фаза 2 (Локальный ускоренный слайдинг Бородич с рестартами):} начиная из полученной точки $z^{\mathrm{warm}} \in \overline{B}_r(z^*)$, запускается Вариант~А (локализованный Алгоритм~1) на шаре $\overline{B}_{2r}(z^{\mathrm{warm}})$ с рестартами. Поскольку $2 L_{1,i} r \le 1$, множитель $\exp(2 L_{1,i} r) \le e$ превращается в универсальную константу, и достигается линейная сходимость с полным покомпонентным разделением.
+\end{itemize}
+
+\subsubsection{Условие суммарной $(L_0, L_1)$-гладкости оператора $F$}
+
+Чтобы анализировать Фазу~1 для суммарного оператора $F(z) = \sum_{i=1}^n (\nabla p_i(z) + Q_i(z))$, требуется, чтобы индивидуальные градиенты $\nabla p_i(z)$ не компенсировали друг друга слишком сильно (иначе суммарный оператор $\Vert F(z) \Vert_2$ может оказаться малым при огромных отдельных градиентах $\Vert \nabla p_i(z) \Vert_2$). Формализуем это стандартным условием некомпенсации: существуют константы $L_0, L_1 > 0$ такие, что
+\begin{equation}\label{eq:sum_l0l1_condition}
+\sum_{i=1}^n \big(L_{0,i} + M_i + L_{1,i} \Vert \nabla p_i(z) \Vert_2\big) \le L_0 + L_1 \Vert F(z) \Vert_2 \qquad \forall z \in \mathcal{C}.
+\end{equation}
+
+\begin{example}[Автоматическое выполнение~\eqref{eq:sum_l0l1_condition} для блочно-сепарабельных задач]
+В седловой задаче~\eqref{eq:saddle_as_vi} градиенты $\nabla p_1(x, y) = (\nabla f(x), 0)$ и $\nabla p_2(x, y) = (0, \nabla g(y))$ ортогональны: $\Vert \nabla p_1(z) \Vert_2 + \Vert \nabla p_2(z) \Vert_2 \le \sqrt{2}\Vert \nabla p(z) \Vert_2$. Если дополнительно оператор $Q$ не обнуляет $\nabla p(z)$ (например, вне малой окрестности оптимума или при $\mu > 0$), условие~\eqref{eq:sum_l0l1_condition} выполняется с потерей множителя $\sqrt{n}$. В силу~\eqref{eq:sum_l0l1_condition} суммарный оператор $F$ сам удовлетворяет симметричному $(L_0, L_1)$-неравенству:
+\begin{equation}\label{eq:F_l0l1}
+\Vert F(u) - F(v) \Vert_2 \le \left(L_0 + L_1 \sup_{\xi \in [u, v]} \Vert F(\xi) \Vert_2\right) \Vert u - v \Vert_2 \qquad \forall u, v \in \mathcal{C}.
+\end{equation}
+\end{example}
+
+\subsubsection{Анализ Фазы 1: $(L_0, L_1)$-экстраградиент}
+
+Рассмотрим задачу без ограничений $\mathcal{C} = \mathbb{R}^d$ (при наличии ограничений $\mathcal{C}$ используется проекционный аналог с операторным отображением градиента) и зададим шаг экстраградиента по правилу:
+\begin{equation}\label{eq:eg_stepsize}
+\gamma_k := \frac{\eta}{L_0 + L_1 \Vert F(z^k) \Vert_2}, \qquad z^{k+1/2} := z^k - \gamma_k F(z^k), \qquad z^{k+1} := z^k - \gamma_k F(z^{k+1/2}),
+\end{equation}
+где параметр $\eta \in (0, 1)$ выбран из условия $\eta e^\eta \le \frac{1}{\sqrt{2}}$ (достаточно взять $\eta = \frac{1}{3}$, так как $\frac{1}{3} e^{1/3} \approx 0.465 < 0.707$).
+
+\begin{lemma}[Одношаговое сжатие $(L_0, L_1)$-экстраградиента]\label{lem:eg_one_step}
+Пусть $F : \mathbb{R}^d \to \mathbb{R}^d$ --- $\mu$-сильно монотонный оператор ($\mu \ge 0$), удовлетворяющий~\eqref{eq:F_l0l1}, $F(z^*) = 0$, и параметр $\eta > 0$ удовлетворяет $\eta e^\eta \le \frac{1}{\sqrt{2}}$. Тогда на каждой итерации метода~\eqref{eq:eg_stepsize} справедливо неравенство:
+\begin{equation}\label{eq:eg_descent}
+\Vert z^{k+1} - z^* \Vert_2^2 \le \Vert z^k - z^* \Vert_2^2 - \frac{1}{2} \Vert z^{k+1/2} - z^k \Vert_2^2 - 2 \gamma_k \mu \Vert z^{k+1/2} - z^* \Vert_2^2.
+\end{equation}
+\end{lemma}
+
+\begin{proof}
+Запишем стандартное трёхточечное тождество для евклидовых норм. Поскольку $z^{k+1} = z^k - \gamma_k F(z^{k+1/2})$ и $z^{k+1/2} = z^k - \gamma_k F(z^k)$, раскроем квадрат расстояния до $z^*$:
+\begin{align}
+\Vert z^{k+1} - z^* \Vert_2^2 &= \Vert (z^k - z^*) - \gamma_k F(z^{k+1/2}) \Vert_2^2 \nonumber \\
+&= \Vert z^k - z^* \Vert_2^2 - 2\gamma_k \langle F(z^{k+1/2}), z^k - z^* \rangle + \gamma_k^2 \Vert F(z^{k+1/2}) \Vert_2^2. \label{eq:eg_id1}
+\end{align}
+Разложим $z^k - z^* = (z^k - z^{k+1/2}) + (z^{k+1/2} - z^*)$ и выразим $\gamma_k^2 \Vert F(z^{k+1/2}) \Vert_2^2$:
+\begin{align*}
+-2\gamma_k \langle F(z^{k+1/2}), z^k - z^{k+1/2} \rangle + \gamma_k^2 \Vert F(z^{k+1/2}) \Vert_2^2 &= -\Vert z^{k+1/2} - z^k \Vert_2^2 + \Vert (z^{k+1/2} - z^k) + \gamma_k F(z^{k+1/2}) \Vert_2^2 \\
+&= -\Vert z^{k+1/2} - z^k \Vert_2^2 + \gamma_k^2 \Vert F(z^{k+1/2}) - F(z^k) \Vert_2^2,
+\end{align*}
+где на последнем шаге использовано $z^{k+1/2} - z^k = -\gamma_k F(z^k)$. Подставляя это в~\eqref{eq:eg_id1}, получаем точное тождество экстраградиента:
+\begin{equation}\label{eq:eg_exact_id}
+\Vert z^{k+1} - z^* \Vert_2^2 = \Vert z^k - z^* \Vert_2^2 - \Vert z^{k+1/2} - z^k \Vert_2^2 + \gamma_k^2 \Vert F(z^{k+1/2}) - F(z^k) \Vert_2^2 - 2\gamma_k \langle F(z^{k+1/2}), z^{k+1/2} - z^* \rangle.
+\end{equation}
+
+Теперь оценим разность $\Vert F(z^{k+1/2}) - F(z^k) \Vert_2$. Длина шага экстраполяции равна
+\[
+\Vert z^{k+1/2} - z^k \Vert_2 = \gamma_k \Vert F(z^k) \Vert_2 = \frac{\eta \Vert F(z^k) \Vert_2}{L_0 + L_1 \Vert F(z^k) \Vert_2} \le \frac{\eta}{L_1}.
+\]
+Применяя к оператору $F$ неравенство~\eqref{eq:grad_diff_exp} (которое выводится из~\eqref{eq:F_l0l1} дословно так же, как в Лемме~\ref{lem:gronwall_l0l1}), получаем:
+\[
+\Vert F(z^{k+1/2}) - F(z^k) \Vert_2 \le \big(L_0 + L_1 \Vert F(z^k) \Vert_2\big) \exp\big(L_1 \Vert z^{k+1/2} - z^k \Vert_2\big) \Vert z^{k+1/2} - z^k \Vert_2.
+\]
+Умножая обе части на $\gamma_k = \frac{\eta}{L_0 + L_1 \Vert F(z^k) \Vert_2}$ и учитывая $L_1 \Vert z^{k+1/2} - z^k \Vert_2 \le \eta$, находим:
+\[
+\gamma_k \Vert F(z^{k+1/2}) - F(z^k) \Vert_2 \le \eta e^\eta \Vert z^{k+1/2} - z^k \Vert_2 \le \frac{1}{\sqrt{2}} \Vert z^{k+1/2} - z^k \Vert_2.
+\]
+Возводя в квадрат, имеем $\gamma_k^2 \Vert F(z^{k+1/2}) - F(z^k) \Vert_2^2 \le \frac{1}{2} \Vert z^{k+1/2} - z^k \Vert_2^2$. Наконец, из $\mu$-сильной монотонности $F$ и условия $F(z^*) = 0$ следует
+\[
+\langle F(z^{k+1/2}), z^{k+1/2} - z^* \rangle = \langle F(z^{k+1/2}) - F(z^*), z^{k+1/2} - z^* \rangle \ge \mu \Vert z^{k+1/2} - z^* \Vert_2^2.
+\]
+Подставляя обе оценки в~\eqref{eq:eg_exact_id}, приходим к~\eqref{eq:eg_descent}.
+\end{proof}
+
+\begin{theorem}[Сложность Фазы 1 (вход в малый шар радиуса $r = \frac{1}{2 L_{1,\max}}$)]\label{thm:phase1_burnin}
+Пусть в условиях Леммы~\ref{lem:eg_one_step} выполнено $\mu > 0$, а начальная точка удовлетворяет $\Vert z^0 - z^* \Vert_2 \le R_0$. Тогда алгоритм~\eqref{eq:eg_stepsize} гарантированно попадает в шар $\overline{B}_r(z^*)$ радиуса $r = \frac{1}{2 L_{1,\max}}$ за число итераций $K_{\mathrm{warm}}$ (каждая из которых требует по $2$ вызова оракулов $(\nabla p_i, Q_i)$), ограниченное полиномом от $L_1 R_0$ без экспоненциальной зависимости от $L_1 R_0$ и без использования глобальной константы $L$:
+\begin{equation}\label{eq:phase1_complexity}
+K_{\mathrm{warm}} = \mathcal{O}\!\left(L_1^2 R_0^2 + \frac{L_0}{\mu} \log\big(1 + L_{1,\max} R_0\big)\right).
+\end{equation}
+\end{theorem}
+
+\begin{proof}
+Из~\eqref{eq:eg_descent} следует, что последовательность $\Vert z^k - z^* \Vert_2$ не возрастает: $\Vert z^k - z^* \Vert_2 \le R_0$ для всех $k \ge 0$. Разобьём итерации на два режима в зависимости от величины $\Vert F(z^k) \Vert_2$:
+
+\emph{Режим больших норм ($\Vert F(z^k) \Vert_2 \ge L_0 / L_1$).} В этом режиме $L_0 + L_1 \Vert F(z^k) \Vert_2 \le 2 L_1 \Vert F(z^k) \Vert_2$, поэтому длина шага экстраполяции ограничена снизу универсальной константой:
+\[
+\Vert z^{k+1/2} - z^k \Vert_2 = \frac{\eta \Vert F(z^k) \Vert_2}{L_0 + L_1 \Vert F(z^k) \Vert_2} \ge \frac{\eta}{2 L_1}.
+\]
+Подставляя это в~\eqref{eq:eg_descent}, видим, что квадрат расстояния до $z^*$ уменьшается не менее чем на $\frac{\eta^2}{8 L_1^2}$ за каждый такой шаг. Поскольку $\Vert z^0 - z^* \Vert_2^2 \le R_0^2$, общее число итераций в режиме больших норм за всё время работы алгоритма не превышает $\frac{8 L_1^2 R_0^2}{\eta^2} = \mathcal{O}(L_1^2 R_0^2)$.
+
+\emph{Режим умеренных норм ($\Vert F(z^k) \Vert_2 < L_0 / L_1$).} Здесь $L_0 + L_1 \Vert F(z^k) \Vert_2 < 2 L_0$, поэтому шаг ограничен снизу: $\gamma_k > \frac{\eta}{2 L_0}$. Воспользуемся неравенством треугольника $\Vert z^k - z^* \Vert_2^2 \le 2 \Vert z^{k+1/2} - z^k \Vert_2^2 + 2 \Vert z^{k+1/2} - z^* \Vert_2^2$. Из~\eqref{eq:eg_descent} при $\frac{\eta \mu}{L_0} \le \frac{1}{2}$ имеем:
+\begin{align*}
+\Vert z^{k+1} - z^* \Vert_2^2 &\le \Vert z^k - z^* \Vert_2^2 - \frac{1}{2}\Vert z^{k+1/2} - z^k \Vert_2^2 - \frac{\eta \mu}{L_0}\Vert z^{k+1/2} - z^* \Vert_2^2 \\
+&\le \Vert z^k - z^* \Vert_2^2 - \frac{\eta \mu}{2 L_0}\Big(2\Vert z^{k+1/2} - z^k \Vert_2^2 + 2\Vert z^{k+1/2} - z^* \Vert_2^2\Big) \le \left(1 - \frac{\eta \mu}{2 L_0}\right)\Vert z^k - z^* \Vert_2^2.
+\end{align*}
+Таким образом, на каждой итерации в режиме умеренных норм происходит геометрическое сжатие квадрата расстояния с показателем $1 - \frac{\eta \mu}{2 L_0}$. Чтобы сжать $\Vert z^k - z^* \Vert_2^2$ от $R_0^2$ до $r^2 = \frac{1}{4 L_{1,\max}^2}$, достаточно не более $\mathcal{O}\big(\frac{L_0}{\mu}\log(1 + L_{1,\max} R_0)\big)$ итераций в этом режиме. Суммируя количество шагов в обоих режимах, получаем~\eqref{eq:phase1_complexity}.
+\end{proof}
+
+\subsubsection{Фаза 2: локальный рекурсивный слайдинг Бородич с рестартами}
+
+Попав в точку $z^{\mathrm{warm}}$ с $\Vert z^{\mathrm{warm}} - z^* \Vert_2 \le r = \frac{1}{2 L_{1,\max}}$, мы запускаем Вариант~А (Теорема~\ref{thm:variant_A}) с рестартами по стандартной схеме Следствия~4.8 работы~\cite{Borodich2025}:
+\begin{itemize}
+    \item на $m$-м рестарте ($m = 0, 1, \dots$) поддерживается оценка радиуса $r_m = r \cdot 2^{-m}$ (так что $z^* \in \overline{B}_{r_m}(z^{(m)})$) и задаётся $D_m = r_m$;
+    \item на этом шаре $L_{1,i} D_m \le L_{1,\max} r = \frac{1}{2}$, поэтому в~\eqref{eq:hat_Li_D} экспонента ограничена абсолютной константой $\exp(L_{1,i} D_m) \le e^{1/2} < 2$;
+    \item локальная константа гладкости удовлетворяет $\widehat{L}_i(D_m) \le \widetilde{L}_i^{\mathrm{loc}} := 2 e (L_{0,i} + L_{1,i}\Vert \nabla p_i(z^*) \Vert_2)$ (не зависит от начального расстояния $R_0$ и огромной глобальной $L_i$!);
+    \item выбирая относительную точность одного запуска $\epsilon = \frac{\mu}{4}$, из~\eqref{eq:variant_A_gap} при $\hat{z} = z^*$ и $\mu$-сильной выпуклости $p$ получаем
+    \[
+    \frac{\mu}{2}\Vert z^{(m+1)} - z^* \Vert_2^2 \le \langle Q(z^*), z^{(m+1)} - z^* \rangle + p(z^{(m+1)}) - p(z^*) \le \frac{\mu}{8}\Vert z^* - z^{(m)} \Vert_2^2,
+    \]
+    откуда $\Vert z^{(m+1)} - z^* \Vert_2 \le \frac{1}{2}\Vert z^{(m)} - z^* \Vert_2 \le r_{m+1}$.
+\end{itemize}
+
+Объединяя Фазу~1 и Фазу~2, приходим к итоговому результату Варианта~Б.
+
+\begin{theorem}[Двухфазная сложность без $\exp(L_{1,i} R_0)$ при $\mu > 0$ и произвольном $n \ge 1$]\label{thm:variant_B_twophase}
+В условиях Теоремы~\ref{thm:phase1_burnin} двухфазный алгоритм (Фаза~1: $(L_0, L_1)$-экстраградиент~\eqref{eq:eg_stepsize} до входа в $\overline{B}_r(z^*)$; Фаза~2: рестарты локализованного Алгоритма~1 Бородич на сжимающихся шарах радиуса $r_m = r \cdot 2^{-m}$) находит точку $\tilde{z}$ с $\Vert \tilde{z} - z^* \Vert_2 \le \rho$ за суммарное число вызовов оракулов каждой компоненты $i = 1, \dots, n$:
+\begin{equation}\label{eq:twophase_total}
+N(\nabla p_i),\; N(Q_i) = \underbrace{\mathcal{O}\!\left(L_1^2 R_0^2 + \frac{L_0}{\mu}\log(1 + L_{1,\max} R_0)\right)}_{\text{Фаза 1: прогрев без } \log(1/\rho) \text{ и без } \exp(L_1 R_0)} \;+\; \underbrace{\mathcal{O}\!\left(6^n \max\left\{\sqrt{\frac{\widetilde{L}_i^{\mathrm{loc}}}{\mu}},\; \frac{M_i}{\mu},\; 1\right\} \log\frac{1}{L_{1,\max} \rho}\right)}_{\text{Фаза 2: полное разделение всех } n \text{ компонент}},
+\end{equation}
+где $\widetilde{L}_i^{\mathrm{loc}} = 2 e \big(L_{0,i} + L_{1,i}\Vert \nabla p_i(z^*) \Vert_2\big)$.
+\end{theorem}
+
+\begin{remark}[Почему при $\mu = 0$ Фаза 1 не снимает экспоненту]
+При нулевой сильной монотонности ($\mu = 0$) малость дуального зазора не гарантирует сжатия евклидова расстояния $\Vert z^k - z^* \Vert_2$. Поэтому предварительный прогрев не может за конечное число шагов загнать траекторию в шар радиуса $\mathcal{O}(1/L_{1,\max})$ вокруг $z^*$.
+\end{remark}
+
+% ==============================================================================
+\section{Билинейная седловая задача: поломка Допущения 2.6, локальная замена и адаптивные рестарты}
+% ==============================================================================
+
+В работе Бородич, Гасникова и Ковалёва~\cite{Borodich2025} (раздел~2.2 и Теорема~4.7) доказано, что для билинейно-связанной седловой задачи~\eqref{eq:saddle_problem} можно получить ускоренную линейную сходимость \emph{даже когда одна или обе функции $f, g$ не являются сильно выпуклыми} ($\mu_x = 0$ или $\mu_y = 0$), за счёт сильного взаимодействия через матрицу $B$.
+
+\subsection{Роль Допущения 2.6 в классической теории}
+
+В~\cite{Borodich2025} предполагается, что функции $f$ и $g$ имеют глобальные константы гладкости $L_x, L_y$, а связывающая матрица $B$ обладает сильной невырожденностью на ортогональных дополнениях к ядрам:
+\[
+\Vert B u \Vert_2 \ge \mu_{xy} \Vert u \Vert_2 \quad \forall u \in (\ker B)^\perp, \qquad \Vert B^\top v \Vert_2 \ge \mu_{yx} \Vert v \Vert_2 \quad \forall v \in (\ker B^\top)^\perp.
+\]
+В этом случае в~\cite{Borodich2025} вводятся эффективные константы индуцированной сильной выпуклости (Assumption~2.6):
+\begin{equation}\label{eq:borodich_delta_classical}
+\delta_x := \mu_x + \frac{\mu_{xy}^2}{L_y} > 0, \qquad \delta_y := \mu_y + \frac{\mu_{yx}^2}{L_x} > 0.
+\end{equation}
+\textbf{Откуда берётся слагаемое $\mu_{xy}^2 / L_y$?} Если рассмотреть двойственную функцию по переменной $y$, то $\max_y \{\langle B x, y \rangle - g(y)\} = g^*(B x)$, где $g^*$ --- преобразование Лежандра--Фенхеля. По классической теореме двойственности, если $g$ является $L_y$-гладкой на всём $\mathbb{R}^{d_y}$, то сопряжённая функция $g^*$ является $(1/L_y)$-сильно выпуклой! Подстановка аргумента $B x$ индуцирует по переменной $x \in (\ker B)^\perp$ квадратичный рост с константой $\frac{\mu_{xy}^2}{L_y}$.
+
+\subsection{Контрпример: разрушение глобального условия $\delta_x > 0$ при $L_{1,y} > 0$}
+
+При переходе от классической $L_y$-гладкости к $(L_{0,y}, L_{1,y})$-гладкости глобальное условие~\eqref{eq:borodich_delta_classical} \textbf{разрушается}: если $L_{1,y} > 0$ и $L_y = +\infty$, индуцированная сильная выпуклость на бесконечности обращается в нуль. Докажем это на явном аналитическом примере.
+
+\begin{example}[Потеря глобальной сильной выпуклости сопряжённой функции]\label{ex:cosh_counterexample}
+Рассмотрим одномерную билинейную седловую задачу при $\mu_x = \mu_y = 0$ и $\mu_{xy} = \mu_{yx} = 1$:
+\[
+\min_{x \in \mathbb{R}} \max_{y \in \mathbb{R}} \mathcal{L}(x, y) = x y - (\cosh y - 1).
+\]
+Здесь $f(x) \equiv 0$ ($\mu_x = 0$), $B = 1$, $g(y) = \cosh y - 1$. Проверим гладкость $g(y)$:
+\[
+g'(y) = \sinh y, \qquad g''(y) = \cosh y = \sqrt{1 + \sinh^2 y} \le 1 + |\sinh y| = 1 + |g'(y)|.
+\]
+Следовательно, $g(y)$ является глобально симметрично $(L_{0,y}, L_{1,y})$-гладкой с параметрами $L_{0,y} = 1$, $L_{1,y} = 1$ (и $L_y = +\infty$).
+
+Вычислим явный вид сопряжённой функции $g^*(x) = \max_{y \in \mathbb{R}} \{x y - (\cosh y - 1)\}$. Максимум достигается при $\sinh y = x$, то есть $y(x) = \operatorname{arsinh}(x) = \ln(x + \sqrt{1 + x^2})$, причём $\cosh(\operatorname{arsinh}(x)) = \sqrt{1 + x^2}$. Подставляя $y(x)$, находим:
+\[
+g^*(x) = x \operatorname{arsinh}(x) - \sqrt{1 + x^2} + 1.
+\]
+Продифференцируем $g^*(x)$ дважды:
+\[
+(g^*)'(x) = \operatorname{arsinh}(x) + \frac{x}{\sqrt{1 + x^2}} - \frac{x}{\sqrt{1 + x^2}} = \operatorname{arsinh}(x), \qquad (g^*)''(x) = \frac{1}{\sqrt{1 + x^2}}.
+\]
+Отсюда сразу следуют два фундаментальных вывода:
+\begin{enumerate}
+    \item \textbf{Глобально $\delta_x = 0$:} при $|x| \to \infty$ вторая производная $(g^*)''(x) = (1 + x^2)^{-1/2} \to 0$, а сама функция $g^*(x) \sim |x| \ln(2|x|)$ растёт почти линейно, а не квадратично. Поэтому ни при каком $\delta_x > 0$ глобальное условие сильной выпуклости по $x$ выполняться не может.
+    \item \textbf{Локально вблизи оптимума $(x^*, y^*) = (0, 0)$:} в шаре $|x| \le R$ вторая производная ограничена снизу положительной константой $(g^*)''(x) \ge (1 + R^2)^{-1/2} > 0$, восстанавливая квадратичный рост в окрестности седловой точки.
+\end{enumerate}
+\end{example}
+
+\subsection{Центрированная локальная замена условия 2.6}
+
+Лемма~\ref{lem:global_cocoercivity}, доказанная нами в разделе~2.4, объясняет, чем именно следует заменить глобальные константы $L_x, L_y$ в формулах~\eqref{eq:borodich_delta_classical}:
+\begin{itemize}
+    \item вблизи седловой точки $(x^*, y^*) \in \mathcal{S}$ истинный локальный масштаб кривизны задаётся центрированными величинами (см.~\eqref{eq:ax_observable} и Замечание~\ref{rem:l0_eff}):
+    \[
+    L_{0,x}^{\mathrm{eff}} := L_{0,x} + L_{1,x} \Vert B^\top y^* \Vert_2, \qquad L_{0,y}^{\mathrm{eff}} := L_{0,y} + L_{1,y} \Vert B x^* \Vert_2,
+    \]
+    которые не зависят от выбора конкретной точки $(x^*, y^*)$ на аффинном множестве решений $\mathcal{S} = (x^* + \ker B) \times (y^* + \ker B^\top)$, так как $B^\top(y^* + \ker B^\top) = B^\top y^*$ и $B(x^* + \ker B) = B x^*$;
+    \item соответственно, центрированные локальные константы индуцированной сильной выпуклости имеют вид:
+    \begin{equation}\label{eq:centered_delta}
+    \delta_x^{\mathrm{eff}} := \mu_x + \frac{\mu_{xy}^2}{L_{0,y}^{\mathrm{eff}}} > 0, \qquad \delta_y^{\mathrm{eff}} := \mu_y + \frac{\mu_{yx}^2}{L_{0,x}^{\mathrm{eff}}} > 0.
+    \end{equation}
+\end{itemize}
+
+\subsection{Адаптация Теоремы 4.7 Бородич для одного запуска из точки $z_{\mathrm{in}}$}
+
+Теперь покажем, как провести доказательство Теоремы~4.7 из Приложения~M работы~\cite{Borodich2025}, используя вместо огромных глобальных $L_x, L_y$ локальные оценки $\widetilde{L}_x, \widetilde{L}_y$ в точке входа $z_{\mathrm{in}} = (x_{\mathrm{in}}, y_{\mathrm{in}})$ (при условии конечности глобальных $L_x, L_y$, которые могут быть сколь угодно большими).
+
+Зафиксируем точку входа $z_{\mathrm{in}} = (x_{\mathrm{in}}, y_{\mathrm{in}}) \in \mathcal{X} \times \mathcal{Y}$, её ортогональную проекцию на множество седловых точек $z^* = (x^*, y^*) := \operatorname{proj}_{\mathcal{S}}(z_{\mathrm{in}})$ и любые параметры $\widetilde{L}_x, \widetilde{L}_y$, удовлетворяющие
+\begin{equation}\label{eq:tilde_L_bounds}
+\widetilde{L}_x \ge L_x^{\mathrm{loc}}(x_{\mathrm{in}}), \qquad \widetilde{L}_y \ge L_y^{\mathrm{loc}}(y_{\mathrm{in}}),
+\end{equation}
+где $L_x^{\mathrm{loc}}, L_y^{\mathrm{loc}}$ определены в Лемме~\ref{lem:global_cocoercivity}, а также техническим условиям (аналог Assumption~2.7 в~\cite{Borodich2025}):
+\[
+\widetilde{L}_x > 4 \mu_x, \qquad \widetilde{L}_y > 4 \mu_y, \qquad \sqrt{\widetilde{L}_x \widetilde{L}_y} > 4 \max\{\mu_{xy}, \mu_{yx}\}.
+\]
+Определим для этого запуска локальные параметры реформулировки~\cite{Borodich2025}:
+\begin{equation}\label{eq:local_reformulation_params}
+\beta_x := \frac{1}{4 \widetilde{L}_y}, \qquad \beta_y := \frac{1}{4 \widetilde{L}_x}, \qquad \widetilde{\delta}_x := \mu_x + \frac{\mu_{xy}^2}{\widetilde{L}_y}, \qquad \widetilde{\delta}_y := \mu_y + \frac{\mu_{yx}^2}{\widetilde{L}_x},
+\end{equation}
+\[
+\widetilde{P} := \operatorname{diag}\big(\widetilde{\delta}_x I_{d_x},\; \widetilde{\delta}_y I_{d_y}\big), \qquad \widetilde{\kappa}_{xy} := \frac{L_{xy}^2}{\widetilde{\delta}_x \widetilde{\delta}_y}.
+\]
+Определим также взвешенное расстояние до множества решений и функцию Ляпунова с параметрами $(\widetilde{\delta}_x, \widetilde{\delta}_y)$:
+\begin{align}
+\mathcal{R}_{\widetilde{\delta}_x, \widetilde{\delta}_y}^2(z) &:= \widetilde{\delta}_x \Vert x - \operatorname{proj}_{\mathcal{S}_x}(x) \Vert_2^2 + \widetilde{\delta}_y \Vert y - \operatorname{proj}_{\mathcal{S}_y}(y) \Vert_2^2, \label{eq:weighted_dist} \\
+\widetilde{\Psi}(z) &:= \mathcal{R}_{\widetilde{\delta}_x, \widetilde{\delta}_y}^2(z) + 12 D_f(x, x^*) + 12 D_g(y, y^*). \label{eq:lyapunov_psi}
+\end{align}
+
+\begin{theorem}[Одношаговое сжатие функции Ляпунова при локальных $(\widetilde{L}_x, \widetilde{L}_y)$]\label{thm:saddle_one_restart}
+Запустим локализованный Алгоритм~1 (Вариант~А) для $n = 3$ компонент $(p_1 = f,\, p_2 = g,\, p_3 \text{ --- регуляризатор связи из~\cite{Borodich2025}})$ с метрической матрицей $\widetilde{P}$, проекцией на $\widetilde{P}$-шар $B_D(z_{\mathrm{in}}) = \{z : \Vert z - z_{\mathrm{in}} \Vert_{\widetilde{P}} \le D\}$ (содержащий $z^*$) и точностью $\epsilon = \frac{1}{72}$. Тогда выходная точка $z_{\mathrm{out}}$ удовлетворяет:
+\begin{enumerate}
+    \item $\operatorname{proj}_{\mathcal{S}}(z_{\mathrm{out}}) = \operatorname{proj}_{\mathcal{S}}(z_{\mathrm{in}}) = z^*$ (при $\mu_x = 0$ или $\mu_y = 0$);
+    \item функция Ляпунова~\eqref{eq:lyapunov_psi} сжимается с абсолютным множителем:
+    \begin{equation}\label{eq:psi_contraction}
+    \widetilde{\Psi}(z_{\mathrm{out}}) \le \frac{2}{3} \widetilde{\Psi}(z_{\mathrm{in}}),
+    \end{equation}
+    используя при этом $\mathcal{O}(\sqrt{\widehat{L}_x(r_x)/\widetilde{\delta}_x})$ вызовов $\nabla f$, $\mathcal{O}(\sqrt{\widehat{L}_y(r_y)/\widetilde{\delta}_y})$ вызовов $\nabla g$ и $\mathcal{O}(\sqrt{\widetilde{\kappa}_{xy}})$ умножений на $B, B^\top$, где $r_x = D / \sqrt{\widetilde{\delta}_x}$, $r_y = D / \sqrt{\widetilde{\delta}_y}$, а $\widehat{L}_x(r_x), \widehat{L}_y(r_y)$ заданы формулой~\eqref{eq:hat_Li_D}.
+\end{enumerate}
+\end{theorem}
+
+\begin{proof}
+Проверим все пять ключевых пунктов доказательства Теоремы~4.7 из Приложения~M работы~\cite{Borodich2025} с подстановкой параметров~\eqref{eq:local_reformulation_params}:
+
+\emph{1. Параметры гладкости компонент на шаре $B_D(z_{\mathrm{in}})$.} Для любой точки $z = (x, y) \in B_D(z_{\mathrm{in}})$ имеем $\widetilde{\delta}_x \Vert x - x_{\mathrm{in}} \Vert_2^2 + \widetilde{\delta}_y \Vert y - y_{\mathrm{in}} \Vert_2^2 \le D^2$, откуда $\Vert x - x_{\mathrm{in}} \Vert_2 \le r_x := D/\sqrt{\widetilde{\delta}_x}$ и $\Vert y - y_{\mathrm{in}} \Vert_2 \le r_y := D/\sqrt{\widetilde{\delta}_y}$. По Лемме~\ref{lem:local_L_on_ball} на этом шаре $f$ и $g$ имеют евклидовы константы гладкости $\widehat{L}_x(r_x)$ и $\widehat{L}_y(r_y)$, что после нормировки матрицей $\widetilde{P} = \operatorname{diag}(\widetilde{\delta}_x I, \widetilde{\delta}_y I)$ даёт параметры $L_1 = \widehat{L}_x(r_x)/\widetilde{\delta}_x$ и $L_2 = \widehat{L}_y(r_y)/\widetilde{\delta}_y$.
+
+\emph{2. Параметры $L_3, M_3$ для регуляризатора связи $p_3$ и оператора $Q_3$.} В реформулировке Бородич~\cite{Borodich2025} (стр.~54) регуляризатор $p_3(x, y) = \frac{\beta_y}{2}\Vert B x \Vert_2^2 + \frac{\beta_x}{2}\Vert B^\top y \Vert_2^2$ (сдвинутый в $\nabla f(x^*), \nabla g(y^*)$) в норме $\Vert \cdot \Vert_{\widetilde{P}}$ имеет липшицеву константу градиента
+\[
+L_3 = \widetilde{\kappa}_{xy} \max\{\beta_x \widetilde{\delta}_y,\; \beta_y \widetilde{\delta}_x\}.
+\]
+Подставляя определения~\eqref{eq:local_reformulation_params} и условия $\widetilde{L}_x > 4\mu_x$, $\widetilde{L}_y > 4\mu_y$, $\sqrt{\widetilde{L}_x \widetilde{L}_y} > 4\max\{\mu_{xy}, \mu_{yx}\}$, проверяем:
+\[
+\beta_x \widetilde{\delta}_y = \frac{1}{4\widetilde{L}_y}\left(\mu_y + \frac{\mu_{yx}^2}{\widetilde{L}_x}\right) = \frac{\mu_y}{4\widetilde{L}_y} + \frac{\mu_{yx}^2}{4\widetilde{L}_x \widetilde{L}_y} < \frac{1}{16} + \frac{1}{64} < \frac{1}{4},
+\]
+и симметрично $\beta_y \widetilde{\delta}_x < \frac{1}{4}$. Следовательно, $L_3 \le \widetilde{\kappa}_{xy}$ и $M_3 = \sqrt{\widetilde{\kappa}_{xy}}$, то есть слагаемое $p_3$ не ухудшает число матрично-векторных умножений $\mathcal{O}(\sqrt{\widetilde{\kappa}_{xy}})$.
+
+\emph{3. Замена шага (e) через глобальную $(L_0, L_1)$-кокоэрцитивность.} Шаги (a)--(d) доказательства Теоремы~4.7 используют только алгебраическую структуру билинейной связи и выпуклость, не опираясь на гладкость $f$ и $g$. На шаге (e) возникает отрицательная сумма квадратов разностей градиентов в точке входа $z_{\mathrm{in}} = (x_{\mathrm{in}}, y_{\mathrm{in}})$ и седловой точке $z^* = (x^*, y^*)$. Применяя Лемму~\ref{lem:global_cocoercivity} и неравенства~\eqref{eq:tilde_L_bounds}, получаем:
+\begin{align*}
+-\beta_x \Vert \nabla g(y^*) - \nabla g(y_{\mathrm{in}}) \Vert_2^2 - \beta_y \Vert \nabla f(x^*) - \nabla f(x_{\mathrm{in}}) \Vert_2^2 &\ge -2 \beta_x L_y^{\mathrm{loc}}(y_{\mathrm{in}}) D_g(y_{\mathrm{in}}, y^*) - 2 \beta_y L_x^{\mathrm{loc}}(x_{\mathrm{in}}) D_f(x_{\mathrm{in}}, x^*) \\
+&\ge -2 \beta_x \widetilde{L}_y D_g(y_{\mathrm{in}}, y^*) - 2 \beta_y \widetilde{L}_x D_f(x_{\mathrm{in}}, x^*) \\
+&= -\frac{1}{2} D_g(y_{\mathrm{in}}, y^*) - \frac{1}{2} D_f(x_{\mathrm{in}}, x^*),
+\end{align*}
+где использованы точные соотношения $\beta_x \widetilde{L}_y = \frac{1}{4}$ и $\beta_y \widetilde{L}_x = \frac{1}{4}$. Это в точности совпадает с оценкой шага (e) в~\cite{Borodich2025}!
+
+\emph{4. Сохранение проекции $\operatorname{proj}_{\mathcal{S}}(z_{\mathrm{out}}) = \operatorname{proj}_{\mathcal{S}}(z_{\mathrm{in}})$.} Если $\mu_x > 0$, то множество $\mathcal{S}_x = \{x^*\}$ состоит из одной точки, и утверждение тривиально. Если $\mu_x = 0$, то $\mathcal{S}_x = x^* + \ker B$. Все градиентные сдвиги по $x$ в алгоритме формируются векторами из $\operatorname{range}(B^\top) = (\ker B)^\perp$. Поскольку $\widetilde{P}$-шар $B_D(z_{\mathrm{in}})$ является эллипсоидом с блочно-скалярной матрицей $\operatorname{diag}(\widetilde{\delta}_x I_{d_x}, \widetilde{\delta}_y I_{d_y})$ с центром в $z_{\mathrm{in}}$, ортогональная $\widetilde{P}$-проекция точки $z_{\mathrm{in}} + \Delta z$ на $B_D(z_{\mathrm{in}})$ просто умножает вектор $\Delta z = (\Delta x, \Delta y)$ на положительный скаляр $\tau \in (0, 1]$. Следовательно, $\tau \Delta x \in (\ker B)^\perp$, и проекция на $\mathcal{S}_x = x^* + \ker B$ не изменяется (аналогично по $y$).
+
+\emph{5. Итоговое сжатие функции Ляпунова.} Благодаря точному согласованию коэффициентов $\beta_x = \frac{1}{4\widetilde{L}_y}$ и $\widetilde{\delta}_x = \mu_x + \frac{\mu_{xy}^2}{\widetilde{L}_y}$, коэффициенты при $\Vert x_{\mathrm{out}} - x^* \Vert_2^2$ и $\Vert y_{\mathrm{out}} - y^* \Vert_2^2$ в балансе шага удовлетворяют
+\[
+\frac{1}{8}\mu_x + \frac{1}{4}\beta_x \mu_{xy}^2 = \frac{1}{8}\mu_x + \frac{\mu_{xy}^2}{16\widetilde{L}_y} \ge \frac{1}{16}\widetilde{\delta}_x, \qquad \frac{1}{8}\mu_y + \frac{1}{4}\beta_y \mu_{yx}^2 \ge \frac{1}{16}\widetilde{\delta}_y.
+\]
+При выборе относительной точности $\epsilon = \frac{1}{24 n} = \frac{1}{72}$ правая часть оценки~\eqref{eq:variant_A_gap} поглощается левой частью и даёт~\eqref{eq:psi_contraction} по Теореме~\ref{thm:variant_A}.
+\end{proof}
+
+\subsection{Сшивание рестартов при меняющихся $\widetilde{L}_x^{(t)}, \widetilde{L}_y^{(t)}$ через демпфирование}
+
+На рестарте $t = 1, 2, \dots$ по мере приближения точки $z_{\mathrm{in}}^t = (x_{\mathrm{in}}^t, y_{\mathrm{in}}^t)$ к седловой точке $z^*$ нормы градиентов убывают, и наблюдаемые локальные оценки
+\[
+L_x^{\mathrm{obs}}(x) := \min\left\{L_x,\; \max\left\{\frac{L_{0,x}^{\mathrm{eff}} + L_{1,x}\Vert \nabla f(x) \Vert_2}{\nu},\; L_x^{\min}\right\}\right\}, \quad L_y^{\mathrm{obs}}(y) := \min\left\{L_y,\; \max\left\{\frac{L_{0,y}^{\mathrm{eff}} + L_{1,y}\Vert \nabla g(y) \Vert_2}{\nu},\; L_y^{\min}\right\}\right\}
+\]
+(где $L_x^{\min}, L_y^{\min}$ --- нижние пороги из аналога Assumption~2.7) уменьшаются. Однако слишком резкое падение $\widetilde{L}_y^{(t)}$ приводит к скачкообразному росту веса $\widetilde{\delta}_x^{(t)} = \mu_x + \mu_{xy}^2/\widetilde{L}_y^{(t)}$ в функции Ляпунова $\widetilde{\Psi}_t$, что может нарушить её монотонное убывание между рестартами.
+
+Эта проблема решается простым \textbf{демпфированием скорости убывания} параметров $\widetilde{L}_x^{(t)}, \widetilde{L}_y^{(t)}$: начиная с $\widetilde{L}_x^{(0)} = L_x^{\mathrm{obs}}(x_{\mathrm{in}}^0)$, $\widetilde{L}_y^{(0)} = L_y^{\mathrm{obs}}(y_{\mathrm{in}}^0)$, на каждом рестарте $t \ge 1$ полагаем
+\begin{equation}\label{eq:damped_L_update}
+\widetilde{L}_x^{(t)} := \max\left\{\frac{4}{5}\widetilde{L}_x^{(t-1)},\; L_x^{\mathrm{obs}}(x_{\mathrm{in}}^t)\right\}, \qquad \widetilde{L}_y^{(t)} := \max\left\{\frac{4}{5}\widetilde{L}_y^{(t-1)},\; L_y^{\mathrm{obs}}(y_{\mathrm{in}}^t)\right\}.
+\end{equation}
+
+\begin{theorem}[Сходимость демпфированных рестартов и асимптотическая сложность]\label{thm:damped_restarts}
+Пусть на каждом рестарте $t \ge 0$ запускается процедура Теоремы~\ref{thm:saddle_one_restart} с параметрами $(\widetilde{L}_x^{(t)}, \widetilde{L}_y^{(t)})$ из~\eqref{eq:damped_L_update} и радиусом локализации $D_t := \left(\frac{5}{6}\right)^{t/2} \sqrt{\widetilde{\Psi}_0(z_{\mathrm{in}}^0)}$, причём $z_{\mathrm{in}}^t = z_{\mathrm{out}}^{t-1}$. Тогда:
+\begin{enumerate}
+    \item для всех $t \ge 1$ выполнено геометрическое сжатие функции Ляпунова с постоянным коэффициентом $\frac{5}{6}$:
+    \begin{equation}\label{eq:psi_5_6}
+    \widetilde{\Psi}_t(z_{\mathrm{in}}^t) \le \frac{5}{6} \widetilde{\Psi}_{t-1}(z_{\mathrm{in}}^{t-1}) \le \left(\frac{5}{6}\right)^t \widetilde{\Psi}_0(z_{\mathrm{in}}^0);
+    \end{equation}
+    \item евклидовы радиусы шаров $r_{x,t} = D_t/\sqrt{\widetilde{\delta}_x^{(t)}}$ и $r_{y,t} = D_t/\sqrt{\widetilde{\delta}_y^{(t)}}$ экспоненциально стремятся к нулю ($r_{x,t} \le D_t/\sqrt{\delta_x}$, $r_{y,t} \le D_t/\sqrt{\delta_y}$);
+    \item после переходного этапа длины $t_0 = \mathcal{O}\big(\log\frac{L_x}{L_{0,x}^{\mathrm{eff}}} + \log\frac{L_y}{L_{0,y}^{\mathrm{eff}}} + \log\frac{\widetilde{\Psi}_0}{\text{loc}}\big)$ в асимптотической фазе (множитель при $\log(1/\epsilon)$) огромные глобальные константы $L_x, L_y$ полностью исчезают, и каждый рестарт требует лишь
+    \begin{equation}\label{eq:saddle_asymptotic_complexity}
+    \mathcal{O}\!\left(\sqrt{\frac{L_{0,x}^{\mathrm{eff}}}{\delta_x^{\mathrm{eff}}}}\right) \text{ вызовов } \nabla f, \qquad \mathcal{O}\!\left(\sqrt{\frac{L_{0,y}^{\mathrm{eff}}}{\delta_y^{\mathrm{eff}}}}\right) \text{ вызовов } \nabla g, \qquad \mathcal{O}\!\left(\sqrt{\frac{L_{xy}^2}{\delta_x^{\mathrm{eff}}\delta_y^{\mathrm{eff}}}}\right) \text{ умножений на } B, B^\top,
+    \end{equation}
+    где $\delta_x^{\mathrm{eff}}, \delta_y^{\mathrm{eff}}$ определены в~\eqref{eq:centered_delta}.
+\end{enumerate}
+\end{theorem}
+
+\begin{proof}
+Проверим все три утверждения по шагам:
+
+\emph{1. Доказательство сжатия~\eqref{eq:psi_5_6}.} По определению~\eqref{eq:damped_L_update} и~\eqref{eq:ax_observable} имеем $\widetilde{L}_x^{(t)} \ge L_x^{\mathrm{obs}}(x_{\mathrm{in}}^t) \ge L_x^{\mathrm{loc}}(x_{\mathrm{in}}^t)$ и $\widetilde{L}_y^{(t)} \ge L_y^{\mathrm{loc}}(y_{\mathrm{in}}^t)$. Кроме того, по индукции $\Vert z_{\mathrm{in}}^t - z^* \Vert_{\widetilde{P}_t}^2 \le \mathcal{R}_{\widetilde{\delta}_x^{(t)}, \widetilde{\delta}_y^{(t)}}^2(z_{\mathrm{in}}^t) \le \widetilde{\Psi}_t(z_{\mathrm{in}}^t) \le D_t^2$, поэтому $z^* \in B_{D_t}(z_{\mathrm{in}}^t)$, и на рестарте $t$ применимы все выводы Теоремы~\ref{thm:saddle_one_restart}, в частности $\widetilde{\Psi}_t(z_{\mathrm{out}}^t) \le \frac{2}{3}\widetilde{\Psi}_t(z_{\mathrm{in}}^t)$.
+
+Сравним теперь $\widetilde{\Psi}_t(z_{\mathrm{in}}^t)$ и $\widetilde{\Psi}_{t-1}(z_{\mathrm{out}}^{t-1})$ при $z_{\mathrm{in}}^t = z_{\mathrm{out}}^{t-1}$. В функции Ляпунова~\eqref{eq:lyapunov_psi} слагаемые $12 D_f(x, x^*)$ и $12 D_g(y, y^*)$ не зависят от $t$, а меняются только веса $\widetilde{\delta}_x^{(t)}, \widetilde{\delta}_y^{(t)}$. Из правила демпфирования~\eqref{eq:damped_L_update} следует $\widetilde{L}_y^{(t)} \ge \frac{4}{5}\widetilde{L}_y^{(t-1)}$, поэтому:
+\[
+\widetilde{\delta}_x^{(t)} = \mu_x + \frac{\mu_{xy}^2}{\widetilde{L}_y^{(t)}} \le \mu_x + \frac{5}{4}\frac{\mu_{xy}^2}{\widetilde{L}_y^{(t-1)}} \le \frac{5}{4}\left(\mu_x + \frac{\mu_{xy}^2}{\widetilde{L}_y^{(t-1)}}\right) = \frac{5}{4}\widetilde{\delta}_x^{(t-1)}.
+\]
+Аналогично $\widetilde{\delta}_y^{(t)} \le \frac{5}{4}\widetilde{\delta}_y^{(t-1)}$. Поскольку множитель $\frac{5}{4} > 1$ больше единицы, имеем $\widetilde{\Psi}_t(z_{\mathrm{in}}^t) \le \frac{5}{4}\widetilde{\Psi}_{t-1}(z_{\mathrm{out}}^{t-1})$. Комбинируя это со сжатием $\frac{2}{3}$ на рестарте $t - 1$, получаем:
+\[
+\widetilde{\Psi}_t(z_{\mathrm{in}}^t) \le \frac{5}{4}\widetilde{\Psi}_{t-1}(z_{\mathrm{out}}^{t-1}) \le \frac{5}{4}\cdot\frac{2}{3}\widetilde{\Psi}_{t-1}(z_{\mathrm{in}}^{t-1}) = \frac{5}{6}\widetilde{\Psi}_{t-1}(z_{\mathrm{in}}^{t-1}).
+\]
+
+\emph{2. Сходимость радиусов $r_{x,t}, r_{y,t}$.} Поскольку $\widetilde{L}_y^{(t)} \le L_y$ и $\widetilde{L}_x^{(t)} \le L_x$ на всех шагах, выполнено $\widetilde{\delta}_x^{(t)} \ge \delta_x > 0$ и $\widetilde{\delta}_y^{(t)} \ge \delta_y > 0$. Поэтому $r_{x,t} = D_t/\sqrt{\widetilde{\delta}_x^{(t)}} \le (5/6)^{t/2}\sqrt{\widetilde{\Psi}_0 / \delta_x} \to 0$ геометрически.
+
+\emph{3. Выход на локальный режим~\eqref{eq:saddle_asymptotic_complexity}.} Как только $12 D_f(x_{\mathrm{in}}^t, x^*) \le \widetilde{\Psi}_t(z_{\mathrm{in}}^t) \le \frac{3\nu (L_{0,x}^{\mathrm{eff}})^2}{L_{1,x}^2}$, из глобальной кокоэрцитивности~\eqref{eq:global_cocoercivity}--\eqref{eq:ax_observable} следует:
+\[
+\Vert \nabla f(x_{\mathrm{in}}^t) - \nabla f(x^*) \Vert_2^2 \le \frac{2}{\nu}\big(L_{0,x}^{\mathrm{eff}} + L_{1,x}\Vert \nabla f(x_{\mathrm{in}}^t) - \nabla f(x^*) \Vert_2\big) D_f(x_{\mathrm{in}}^t, x^*).
+\]
+Если $\Vert \nabla f(x_{\mathrm{in}}^t) - \nabla f(x^*) \Vert_2 > \frac{L_{0,x}^{\mathrm{eff}}}{L_{1,x}}$, то сокращение даёт $\Vert \nabla f(x_{\mathrm{in}}^t) - \nabla f(x^*) \Vert_2 \le \frac{4 L_{1,x}}{\nu} D_f(x_{\mathrm{in}}^t, x^*) \le \frac{L_{0,x}^{\mathrm{eff}}}{L_{1,x}}$ --- противоречие. Значит, $\Vert \nabla f(x_{\mathrm{in}}^t) - \nabla f(x^*) \Vert_2 \le \frac{L_{0,x}^{\mathrm{eff}}}{L_{1,x}}$, откуда $L_x^{\mathrm{obs}}(x_{\mathrm{in}}^t) = \mathcal{O}(L_{0,x}^{\mathrm{eff}})$. После этого демпфер $\frac{4}{5}$ за $\mathcal{O}(\log(L_x / L_{0,x}^{\mathrm{eff}}))$ шагов снижает $\widetilde{L}_x^{(t)}$ до уровня $\mathcal{O}(L_{0,x}^{\mathrm{eff}})$, а при $r_{x,t} \le 1/L_{1,x}$ и $r_{y,t} \le 1/L_{1,y}$ экспоненты в $\widehat{L}_x(r_{x,t}), \widehat{L}_y(r_{y,t})$ не превосходят $e$, что даёт оценки~\eqref{eq:saddle_asymptotic_complexity}.
+\end{proof}
+
+\begin{remark}[Устранение $L_x, L_y$ и из переходной фазы]
+Если требуется убрать глобальные $L_x, L_y$ даже из аддитивной переходной фазы $t \le t_0$, перед запуском демпфированных рестартов ставится Фаза~1 ($(L_0, L_1)$-экстраградиент из Теоремы~\ref{thm:phase1_burnin}), доводящая траекторию до окрестности $r \sim 1/L_1$.
+\end{remark}
+
+% ==============================================================================
+\section{Формальные препятствия при динамических весах внутри рекурсии и контекст литературы 2026 года}
+% ==============================================================================
+
+Естественный вопрос состоит в том, нельзя ли отказаться от локализации на шаре $D$ в Варианте~А и сделать веса $\alpha_{t_k}$ и регуляризацию $H_k^k$ \emph{динамическими} прямо внутри \texttt{RecursiveProcedure} при $\mu = 0$ и произвольном $n > 2$. Ниже строго локализованы два алгебраических барьера, блокирующих такое обобщение.
+
+\subsection{Две алгебраические развилки внутри \texttt{RecursiveProcedure} для $n > 2$}
+
+Пусть на итерации $t_k$ уровня $k$ вычисляется локальная оценка кривизны $G_k(t_k)$ (например, через текущую норму градиента или длину шага).
+
+\begin{proposition}[Поломка перекрёстных членов при $Q_i \neq 0$ и переменных $\alpha_{t_k}$]\label{prop:obstruction_Qi}
+В доказательстве Леммы~K.4 работы~\cite{Borodich2025} при суммировании по шагам уровня $k$ неравенство на шаге $t_k$ умножается на вес $a_{t_k + 1} > 0$, связанный с суммой весов $A_{t_k + 1} = A_{t_k} + a_{t_k + 1}$ правилом $\alpha_{t_k} = \frac{a_{t_k + 1}}{A_{t_k + 1}}$. Чтобы телескопирование на уровне $k$ проходило при переменной оценке $G_k(t_k)$, требуется баланс
+\begin{equation}\label{eq:variable_alpha_balance}
+\frac{a_{t_k + 1}^2}{A_{t_k + 1}} G_k(t_k) = C_k = \mathrm{const} \quad \Longrightarrow \quad a_{t_k + 1} \alpha_{t_k} = \frac{C_k}{G_k(t_k)}.
+\end{equation}
+В оригинальном алгоритме~\cite{Borodich2025} величина $a_{t_k + 1} \alpha_{t_k} \equiv 1$ постоянна, что сокращает множитель $\alpha_{t_k}^{-1}$ в определении $\hat{p}_i^k$ и сохраняет единичный вес перед $\hat{Q}_i^k$ в перекрёстных остатках $D_{i; t_k}^k$ для всех $i > k$. При переменном $G_k(t_k)$ произведение $a_{t_k + 1} \alpha_{t_k} = C_k / G_k(t_k)$ зависит от номера шага $t_k$:
+\begin{itemize}
+    \item если для всех $i > k$ операторы $Q_i \equiv 0$ (чистая композитная минимизация $p(z) = \sum_{i=1}^n p_i(z)$), то в $D_{i; t_k}^k$ присутствуют только разности значений $\hat{p}_i^k$, и переменную величину $C_k / G_k(t_k)$ можно скомпенсировать, останавливая внутреннюю рекурсию уровня $k + 1$ по критерию накопленного веса $A_{T_{k+1}}^{k+1} \propto \frac{1}{G_k(t_k)}$;
+    \item если же среди $i > k$ имеется хотя бы один ненулевой кососимметричный оператор $Q_i \neq 0$, то масштабы $\hat{p}_i^k$ (квадратичный по внутреннему весу) и $\hat{Q}_i^k$ (линейный по внутреннему весу) расходятся, и никакой выбор числа внутренних шагов $T_{k+1}$ не может одновременно сделать константой оба слагаемых в $D_{i; t_k}^k$.
+\end{itemize}
+\end{proposition}
+
+\begin{proposition}[Потеря контроля длины шага при неускоренной вставке $\alpha_{t_k} \equiv 1$]\label{prop:obstruction_unacc}
+Если зафиксировать $\alpha_{t_k} \equiv 1$ на уровне $k$, проблема перекрёстного множителя исчезает, однако в слайдинге с $n > 2$ промежуточная точка $z_{t_k + 1/2}^k$ вычисляется внутренней рекурсией с учётом всех остальных компонент $(p_j, Q_j)$ ($j \neq k$). В отличие от однокомпонентного градиентного спуска (Теорема~3.1 и Лемма~3.2 в~\cite{Gorbunov2024}), смещение $z_{t_k + 1/2}^k - z_{t_k}^k$ не коллинеарно $\nabla p_k(z_{t_k}^k)$, поэтому условие локальности $\Vert z_{t_k + 1/2}^k - z_{t_k}^k \Vert_2 \le \eta / L_{1,k}$ может нарушаться на произвольном числе шагов без принудительного ограничения радиуса шага шаром $\overline{B}_D(z_{\mathrm{in}})$.
+\end{proposition}
+
+\subsection{Контраст с работами 2026 года по гёльдеровой и $(L_0, L_1)$-гладкости}
+
+Полученные выводы естественным образом встраиваются в ландшафт исследований 2026 года:
+
+\begin{enumerate}
+    \item \textbf{Контраст с гёльдеровой гладкостью (Нгуен, Гасников, Ковалёв, 2026~\cite{Nguyen2026Holder}):} в недавней статье~\cite{Nguyen2026Holder} конструкция слайдинга Бородич перенесена на гёльдерово-гладкие функции ($\Vert \nabla f(x) - \nabla f(y) \Vert_* \le L_\nu \Vert x - y \Vert^\nu$, $\nu \in (0, 1]$). При гёльдеровой гладкости кривизна взрывается на \emph{малых} расстояниях ($\Vert x - y \Vert \to 0$), но растёт сублинейно на больших; поэтому ценой небольшой аддитивной ошибки $\delta > 0$ градиент можно глобально на всём $\mathbb{R}^d$ приблизить $(\delta, L(\delta))$-неточным оракулом с \emph{постоянной} константой $L(\delta) \propto \delta^{-\frac{1-\nu}{1+\nu}}$, после чего рекурсия Бородича переносится напрямую. При $(L_0, L_1)$-гладкости ситуация противоположна: кривизна регулярна локально, но взрывается на \emph{бесконечности} (как $e^{L_1 x}$). Никакая конечная аддитивная ошибка $\delta$ не позволяет зажать $e^{L_1 x}$ сверху квадратикой $\frac{L(\delta)}{2} x^2 + \delta$ на всём $\mathbb{R}^d$, поэтому мост через глобальный неточный оракул здесь математически невозможен.
+    \item \textbf{Согласованность с двухфазными схемами локализации (Двинских и др., 2026~\cite{Dvinskikh2026}; Рудоманов и др., 2026~\cite{Rudomanov2026a, Rudomanov2026b}):} в работах группы А.~Гасникова осени 2026 года показано, что оптимальный способ обхода экспоненты в ускоренных $(L_0, L_1)$-методах состоит в двухфазной архитектуре \emph{«локализация / стабилизация $\to$ ускорение с рестартами в сертифицированных шарах радиуса $\mathcal{O}(1/L_1)$»}. Наш Вариант~Б (Теорема~\ref{thm:variant_B_twophase}) и демпфированные рестарты (Теорема~\ref{thm:damped_restarts}) реализуют именно эту архитектуру в многокомпонентном случае монотонных ВН и седловых задач с сохранением покомпонентного разделения оракульных сложностей.
+\end{enumerate}
+
+\subsection{Итоговая сводка результатов}
+
+\begin{center}
+\begin{tabularx}{\textwidth}{l l X}
+\toprule
+\textbf{Режим задачи} & \textbf{Метод / Теорема} & \textbf{Гарантия сложности и границы применимости} \\
+\midrule
+Произвольное $n \ge 2$, $\mu \ge 0$, локализация на шаре $D$ & \textbf{Вариант А} (Теорема~\ref{thm:variant_A}) & Полное разделение $\mathcal{O}\big(6^n \max\{\sqrt{\widehat{L}_i(D)/\varepsilon}, M_i/\varepsilon, 1\}\big)$ с локальной $\widehat{L}_i(D) \le L_i$; эффективно при $c_P L_{1,i} D = \mathcal{O}(1)$. \\
+\addlinespace
+Произвольное $n \ge 1$, сильная монотонность $\mu > 0$ & \textbf{Вариант Б} (Теорема~\ref{thm:variant_B_twophase}) & Полиномиальный прогрев в шар $r = \frac{1}{2 L_{1,\max}}$ + локальный слайдинг Бородич с рестартами: полное разделение всех $n$ компонент перед $\log(1/\rho)$ \emph{без} $\exp(L_{1,i} R_0)$ и глобальных $L_i$. \\
+\addlinespace
+Билинейная седловая задача, $\delta_x^{\mathrm{eff}}, \delta_y^{\mathrm{eff}} > 0$ & \textbf{Демпфированные рестарты} (Теорема~\ref{thm:damped_restarts}) & Замена сломанного глобального условия~2.6 на центрированное~\eqref{eq:centered_delta}; устранение огромных $L_x, L_y$ из асимптотики $\log(1/\epsilon)$ со скоростью сжатия $\frac{5}{6}$. \\
+\addlinespace
+Конечная глобальная $L$ и $(L_0, L_1)$-гладкость & \textbf{Оценка через супремум} (Утверждение~\ref{prop:no_exp_finite_L}) & Строгое неравенство без экспоненты с кубическим остатком $\frac{1}{3} L_1 L r^3$; улучшает $\frac{L}{2}r^2$ на шагах $r \lesssim \frac{1}{L_1}$. \\
+\addlinespace
+Произвольное $n \ge 3$, $\mu = 0$, без локализации & \textbf{Открытая граница} (Утверждения~\ref{prop:obstruction_Qi}--\ref{prop:obstruction_unacc}) & Глобальный $(\delta, L)$-неточный оракул не существует; динамические веса внутри рекурсии блокируются несовпадением масштабов $p_i$ и $Q_i \neq 0$. \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+% ==============================================================================
+\begin{thebibliography}{99}
+
+\bibitem{Borodich2025}
+Borodich, E., Gasnikov, A., \& Kovalev, D. (2025).
+\emph{On Linear Convergence in Smooth Convex--Concave Bilinearly-Coupled Saddle-Point Problems}.
+Proceedings of the 42nd International Conference on Machine Learning (ICML 2025).
+
+\bibitem{Borodich2026Thesis}
+Бородич, Е. (2026).
+\emph{Оптимальные алгоритмы для гладких (сильно) выпуклых --- (сильно) вогнутых седловых задач с композитной структурой}.
+Диссертация на соискание учёной степени кандидата физико-математических наук, МФТИ.
+
+\bibitem{Gorbunov2024}
+Gorbunov, E., Tupitsa, N., Choudhury, S., Aliev, A., Richt\'arik, P., Horv\'ath, S., \& Tak\'a\v{c}, M. (2024).
+\emph{Methods for Convex $(L_0, L_1)$-Smooth Optimization: Clipping, Acceleration, and Adaptivity}.
+arXiv preprint arXiv:2409.14989.
+
+\bibitem{Zhang2020}
+Zhang, J., He, T., Sra, S., \& Jadbabaie, A. (2020).
+\emph{Why Gradient Clipping Accelerates Training: A Theoretical Justification for Adaptivity}.
+International Conference on Learning Representations (ICLR 2020), arXiv:1905.11881.
+
+\bibitem{Nguyen2026Holder}
+Nguyen, N. T., Gasnikov, A., \& Kovalev, D. (2026).
+\emph{Sliding Methods for H\"older-Smooth Convex--Concave Minimax Optimization with Bilinear Coupling}.
+arXiv preprint arXiv:2608.03846.
+
+\bibitem{Nguyen2026Multiblock}
+Nguyen, N. T., Dorofeev, I., et al. (2026).
+\emph{Complexity of Multiblock Convex--Concave Saddle-Point Problems with General Smooth Coupling}.
+arXiv preprint arXiv:2610.12656.
+
+\bibitem{Dvinskikh2026}
+Dvinskikh, D., Gasnikov, A., Lobanov, A., \& Latypov, I. (2026).
+\emph{Localize, Restart, Accelerate: Stochastic Optimization under Generalized Smoothness}.
+arXiv preprint arXiv:2609.06555.
+
+\bibitem{Rudomanov2026a}
+Rudomanov, S., Fomin, V., Gasnikov, A., \& Stonyakin, F. S. (2026).
+\emph{Descending Everest with First-Order Oracles: Oracle Complexity of Convex Optimization under $(L_0, L_1)$-Smoothness}.
+arXiv preprint arXiv:2610.21461.
+
+\bibitem{Rudomanov2026b}
+Rudomanov, S., Fomin, V., Gasnikov, A., \& Stonyakin, F. S. (2026).
+\emph{Descending Everest, Part II: Oracle Complexity of Minimizing a Sum of $(L_0, L_1)$-Smooth Functions}.
+arXiv preprint arXiv:2611.04171.
+
+\end{thebibliography}
+
+\end{document}
