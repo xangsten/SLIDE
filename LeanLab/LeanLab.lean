@@ -1,13 +1,2 @@
-import LeanLab.SymmetricSmoothness
-import LeanLab.SlidingGeneralizedSmoothness
-import LeanLab.PathASchedule
-
-import LeanLab.TwoLevelSliding
-import LeanLab.TwoLevelSearch
-import LeanLab.PlainSliding
-import LeanLab.AdaptivePlainSliding
-import LeanLab.AdaptiveAcceleratedSliding
-import LeanLab.PlainSlidingStepSearch
-
-import LeanLab.LocalizedRecursiveSliding
-import LeanLab.MultilevelSliding
+import LeanLab.PathA
+import LeanLab.Variants

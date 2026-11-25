@@ -1,6 +1,6 @@
 module
 
-public import LeanLab.AdaptivePlainSliding
+public import LeanLab.Variants.Plain
 
 set_option linter.style.header false
 

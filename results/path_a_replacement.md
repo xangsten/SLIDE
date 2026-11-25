@@ -547,6 +547,12 @@ $p_b'(x')-p_b'(x)$. Поэтому траектория, запросы крив
 Подстановка общего $A(R)$ из (A.4) даёт более грубую,
 зависящую от $b$ оценку.
 
+## Формальная проверка
+
+Теорема `Family.pathA_of_symmetric` связывает алгоритм со всеми его попытками. Она даёт глобальный зазор (A.1), логарифмический предел числа попыток (A.8) и бюджеты обоих оракулов в исходной нумерации (A.9), включая запросы до прерывания попытки. Верхние границы кривизны выводятся из симметричной гладкости на компактном шаре и используются в доказательстве конечности поиска. [Restart.lean](../LeanLab/LeanLab/PathA/Restart.lean).
+
+Индукция по глубине и оценка (A.7) проверены для рекурсии, которая сама выполняет проверки секущих. Переход к точности и контроль радиуса используют расписание (A.2). [Pass.lean](../LeanLab/LeanLab/PathA/Pass.lean) · [Guarantees.lean](../LeanLab/LeanLab/PathA/Guarantees.lean).
+
 ## Литература
 
 1. E. Borodich, A. Gasnikov, D. Kovalev. *On Linear Convergence in Smooth Convex-Concave Bilinearly-Coupled Saddle-Point Optimization: Lower Bounds and Optimal Algorithms*. ICML, 2025. Теорема 4.5, следствие 4.6 и приложения B, K, L. [Статья](https://proceedings.mlr.press/v267/borodich25a.html)

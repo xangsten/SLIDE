@@ -1,8 +1,7 @@
 module
 
-public import LeanLab.TwoLevelSliding
-public import LeanLab.SymmetricSmoothness
-public import LeanLab.PathASchedule
+public import LeanLab.Common.Recursive
+public import LeanLab.Common.SymmetricSmoothness
 
 set_option linter.style.header false
 
@@ -26,35 +25,12 @@ noncomputable section
 
 variable {E : Type*} [NormedAddCommGroup E] [InnerProductSpace ℝ E]
 
-/-- One pair of oracles with curvature bounds and a positive cycle length. -/
-structure Level (E : Type*) where
-  gradient : E → E
-  operator : E → E
-  smoothness : ℝ
-  lipschitz : ℝ
-  last : ℕ
-
-/-- The sum of frozen quadratic models, up to an additive constant. -/
-structure Model (E : Type*) where
-  curvature : ℝ
-  linear : E
-
 /-- The current function argument and the two curvature scales. -/
 structure Frame (E : Type*) where
   argument : E → E
   smoothScale : ℝ
   operatorScale : ℝ
   model : Model E
-
-inductive Oracle
-  | gradient
-  | operator
-  deriving DecidableEq
-
-structure Query (E : Type*) where
-  level : ℕ
-  oracle : Oracle
-  point : E
 
 structure Result (E : Type*) where
   average : E
@@ -109,9 +85,6 @@ def Frame.initial : Frame E := ⟨id, 1, 1, ⟨0, 0⟩⟩
 /-- One pass from a common starting point, in the working Hilbert norm. -/
 def pass {D : Set E} (P : Projection D) (levels : List (Level E)) (s : E) : Result E :=
   run P levels 0 Frame.initial (fun _ => s)
-
-/-- The set used for the projected leaf and corrections in variant A. -/
-def region (C : Set E) (s : E) (R : ℝ) : Set E := C ∩ Metric.closedBall s R
 
 /-- Localized curvature from symmetric generalized smoothness, with the
 gradient at the initial point passed explicitly so it can be cached. -/
@@ -201,12 +174,6 @@ theorem pass_feasible {C : Set E} (hC : Convex ℝ C) {s : E} {R : ℝ}
 def calls (result : Result E) (i : ℕ) (o : Oracle) : ℕ :=
   result.queries.countP fun q => decide (q.level = i ∧ q.oracle = o)
 
-/-- Number of visits to an indexed level for a starting depth. -/
-def visits : List (Level E) → ℕ → ℕ → ℕ
-  | [], _, _ => 0
-  | l :: ls, k, i =>
-    (l.last + 1) * ((if k = i then 1 else 0) + visits ls (k + 1) i)
-
 def Oracle.perVisit : Oracle → ℕ
   | .gradient => 1
   | .operator => 2
@@ -233,32 +200,6 @@ theorem pass_calls {D : Set E} (P : Projection D) (levels : List (Level E)) (s :
     (i : ℕ) (o : Oracle) :
     calls (pass P levels s) i o = visits levels 0 i * o.perVisit :=
   run_calls P levels 0 _ _ i o
-
-omit [NormedAddCommGroup E] [InnerProductSpace ℝ E] in
-/-- Exact prefix-product formula for visits to a component in the list. -/
-theorem visits_eq_prod (levels : List (Level E)) (k j : ℕ) (hj : j < levels.length) :
-    visits levels k (k + j) =
-      ∏ i ∈ Finset.range (j + 1), (levels[i]?).elim 1 (fun l => l.last + 1) := by
-  induction levels generalizing k j with
-  | nil => simp at hj
-  | cons l ls ih =>
-    cases j with
-    | zero =>
-      have hbelow : ∀ (tail : List (Level E)) (base target : ℕ), target < base →
-          visits tail base target = 0 := by
-        intro tail
-        induction tail with
-        | nil => simp [visits]
-        | cons a tail ht =>
-          intro base target hlt
-          simp [visits, (ne_of_lt hlt).symm, ht _ _ (by omega : target < base + 1)]
-      simp [visits, hbelow ls (k + 1) k (by omega)]
-    | succ j =>
-      have hj' : j < ls.length := by simpa using hj
-      have hk : k ≠ k + (j + 1) := by omega
-      rw [visits, ite_eq_right hk, zero_add, show k + (j + 1) = k + 1 + j by omega, ih _ _ hj']
-      conv_rhs => rw [Finset.prod_range_succ']
-      simp [Nat.mul_comm]
 
 /-- The schedule in the edited variant A, with two as the common multiplier. -/
 def scheduledLength (h : ℕ → ℝ) : ℕ → ℕ
@@ -400,22 +341,6 @@ theorem accuracy_calls_le {D : Set E} (P : Projection D) (n : ℕ) (g Q : ℕ �
     (calls (pass P (scheduledLevels n g Q Λ M h) s) i o : ℝ) ≤
       3 ^ (i + 1) * h i * o.perVisit :=
   scheduled_calls_le P n g Q Λ M (le_max_left ..) hm s hi o
-
-/-- The minimum obtained by projecting the center of a positive quadratic. -/
-theorem projected_model_bound {D : Set E} (P : Projection D) {H : ℝ} (hH : 0 < H)
-    (u slope : E) {w : E} (hw : w ∈ D) :
-    let v := P.apply (H⁻¹ • (H • u - slope))
-    model H u slope v - model H u slope w + H / 2 * ‖v - w‖ ^ 2 ≤ 0 := by
-  let a := H⁻¹ • (H • u - slope)
-  let v := P.apply a
-  have hnormal := P.normal a hw
-  have heq : H • (v - u) + slope = -(H • (a - v)) := by
-    dsimp only [a]
-    conv_rhs => rw [smul_sub, smul_smul, mul_inv_cancel₀ hH.ne', one_smul]
-    module
-  apply leaf_bound
-  rw [heq, inner_neg_left, real_inner_smul_left]
-  exact neg_nonneg.mpr (mul_nonpos_of_nonneg_of_nonpos hH.le hnormal)
 
 /-- The recursive base case realizes the minimum of the accumulated model. -/
 theorem run_nil_bound {D : Set E} (P : Projection D) (k : ℕ) (f : Frame E)

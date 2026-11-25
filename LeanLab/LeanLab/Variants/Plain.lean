@@ -1,6 +1,6 @@
 module
 
-public import LeanLab.TwoLevelSearch
+public import LeanLab.Variants.TwoLevelSearch
 
 set_option linter.style.header false
 

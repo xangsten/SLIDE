@@ -1,22 +1,17 @@
 # Слайдинг при обобщённой гладкости
 
 - [Постановка задачи](<исследовательская задача.md>) описывает цель исследования и исходные статьи.
-- [Исходные статьи](orig/), [переводы](ru/) и [аннотации](annot/) собраны отдельно. Обозначения вынесены в [заметку по статье Borodich и соавторов](annot/Borodich_et_al_2025_notation_ru.md).
-- [Черновик LaTeX](formalize/l0_l1.tex) объединяет постановку, оценки и ограничения методов.
-- [Промежуточные результаты](intermediate_results/) включают [рекурсивную схему](intermediate_results/path_a_replacement.md), [неускоренную схему](intermediate_results/path_b_plain.md), [ускоренную схему](intermediate_results/path_c_accelerated.md) и [заметку о динамических весах](intermediate_results/multilevel_sliding_research.md).
-- [Архив](trash/) содержит ранние планы исследования.
+- [Статьи и переводы](papers/) и [аннотации](annot/) собраны отдельно. Обозначения вынесены в [заметку по статье Borodich и соавторов](annot/Borodich_et_al_2025_notation_ru.md).
+- В [results](results/) находится [текст пути А](results/path_a_replacement.md) с формулировкой, доказательством и ссылками на Lean.
+- В [архиве](archive/) по отдельным папкам собраны ранний путь А, пути Б и В, динамические веса и общие планы. [Сравнительный обзор](archive/theory_review/) включает ранний черновик LaTeX и его разборы.
 
 ## Формализация в Lean
 
-Точка входа находится в [LeanLab.lean](LeanLab/LeanLab.lean). Сборка запускается командой `lake build` из каталога LeanLab.
+Из каталога LeanLab команда `lake build` собирает весь проект, а `lake build LeanLab.PathA` проверяет путь А и его общие зависимости. [Точка входа проекта](LeanLab/LeanLab.lean)
 
-| Тема | Модули |
-| --- | --- |
-| Обобщённая гладкость и расписание рекурсии | [SymmetricSmoothness](LeanLab/LeanLab/SymmetricSmoothness.lean), [SlidingGeneralizedSmoothness](LeanLab/LeanLab/SlidingGeneralizedSmoothness.lean), [PathASchedule](LeanLab/LeanLab/PathASchedule.lean) |
-| Двухуровневая схема и перезапуски | [TwoLevelSliding](LeanLab/LeanLab/TwoLevelSliding.lean), [TwoLevelSearch](LeanLab/LeanLab/TwoLevelSearch.lean) |
-| Неускоренный слайдинг и подбор шага | [PlainSliding](LeanLab/LeanLab/PlainSliding.lean), [AdaptivePlainSliding](LeanLab/LeanLab/AdaptivePlainSliding.lean), [PlainSlidingStepSearch](LeanLab/LeanLab/PlainSlidingStepSearch.lean) |
-| Рекурсия варианта А на локализованном множестве | [LocalizedRecursiveSliding](LeanLab/LeanLab/LocalizedRecursiveSliding.lean) |
-| Ускоренная и многоуровневая схемы | [AdaptiveAcceleratedSliding](LeanLab/LeanLab/AdaptiveAcceleratedSliding.lean), [MultilevelSliding](LeanLab/LeanLab/MultilevelSliding.lean) |
+- **PathA.** Расписание циклов, адаптивная рекурсия, зазор принятого прохода и итоговая теорема `Family.pathA_of_symmetric`. [Schedule](LeanLab/LeanLab/PathA/Schedule.lean) · [Pass](LeanLab/LeanLab/PathA/Pass.lean) · [Guarantees](LeanLab/LeanLab/PathA/Guarantees.lean) · [Restart](LeanLab/LeanLab/PathA/Restart.lean)
+- **Common.** Симметричная гладкость, проекции, усреднение и общие леммы рекурсии. [Общие модули](LeanLab/LeanLab/Common/)
+- **Variants.** Двухуровневый поиск, неускоренная и ускоренная схемы, рекурсия с фиксированной кривизной и многоуровневые динамические веса. [Остальные схемы](LeanLab/LeanLab/Variants/)
 
 ## GitHub configuration for LeanLab
 

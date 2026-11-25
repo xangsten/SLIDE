@@ -1,6 +1,6 @@
 module
 
-public import LeanLab.TwoLevelSliding
+public import LeanLab.Variants.TwoLevel
 
 set_option linter.style.header false
 

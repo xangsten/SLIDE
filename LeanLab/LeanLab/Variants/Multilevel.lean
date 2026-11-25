@@ -1,6 +1,6 @@
 module
 
-public import LeanLab.AdaptiveAcceleratedSliding
+public import LeanLab.Variants.Accelerated
 
 set_option linter.style.header false
 

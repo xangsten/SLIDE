@@ -231,14 +231,14 @@ e^R-e^{R-t}\le G_s t=(e^R-1)/4 .
 
 ## Формальная проверка
 
-[MultilevelSliding.lean](../LeanLab/LeanLab/MultilevelSliding.lean) формализует родительскую лемму (1), телескопирование и блочную поправку, сертификат (3), рост веса, нижнюю оценку для перезапусков и алгебру контрпримеров. Анализ оракульной сложности классической конструкции выше приведён в тексте. Он использует формализованные сертификаты, а полный исполняемый цикл и все счётчики в Lean отдельно не кодировались.
+[Multilevel.lean](../../LeanLab/LeanLab/Variants/Multilevel.lean) формализует родительскую лемму (1), телескопирование и блочную поправку, сертификат (3), рост веса, нижнюю оценку для перезапусков и алгебру контрпримеров. Анализ оракульной сложности классической конструкции выше приведён в тексте. Он использует формализованные сертификаты, а полный исполняемый цикл и все счётчики в Lean отдельно не кодировались.
 
 Проверка 22 теорем через `#print axioms` показала только зависимости `propext`, `Classical.choice` и `Quot.sound`. После `lake build` из каталога LeanLab проверку можно повторить через стандартный ввод.
 
 ```sh
 {
-  printf '%s\n' 'import LeanLab.MultilevelSliding'
+  printf '%s\n' 'import LeanLab.Variants.Multilevel'
   sed -n 's/^theorem \([[:alnum:]_]*\) .*/#print axioms LeanLab.Sliding.Multilevel.\1/p' \
-    LeanLab/MultilevelSliding.lean
+    LeanLab/Variants/Multilevel.lean
 } | lake env lean --stdin
 ```

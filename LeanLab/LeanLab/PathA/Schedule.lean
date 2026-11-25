@@ -1,6 +1,6 @@
 module
 
-public import LeanLab.SlidingGeneralizedSmoothness
+public import LeanLab.Common.Recursive
 
 set_option linter.style.header false
 
@@ -33,8 +33,6 @@ theorem weight_lower (t : ℕ) : 1 / ((t : ℝ) + 1) ≤ weight t := by
       rw [reciprocalWeight, Nat.cast_succ]
       linarith
   simpa [weight, one_div] using inv_anti₀ (inv_pos.mp (weight_pos t)) hrecip
-
-def scale (δ Λ M : ℝ) : ℝ := max (Real.sqrt (Λ / δ)) (M / δ)
 
 def steps (h : ℕ → ℝ) : ℕ → ℕ
   | 0 => ⌈2 * h 0⌉₊
