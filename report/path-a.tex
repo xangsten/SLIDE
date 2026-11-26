@@ -1,0 +1,215 @@
+\section{Путь А. Адаптивная кривизна и рабочий радиус}\label{sec:patha}
+
+Путь А сохраняет рекурсию классического слайдинга. Он выбирает
+кривизну модели по тому отрезку, который реально возник на пробном
+шаге. При неудачной проверке меняется оценка конкретной пары.
+Длины циклов и порядок пар пересчитываются перед следующей попыткой.
+
+\subsection{Алгоритм}
+
+Пусть $s=x_0$, $\delta=\rho/3$, $R_0>0$ и
+$\lambda_i=\max\{\delta,\Lambda_i^0\}$ для начальных оценок
+$\Lambda_i^0\ge0$. Начинаем с радиуса $R_0$ и кривизн
+$\Lambda_i=\lambda_i$. На каждой попытке работаем на
+$D=C\cap\ball_R(s)$. Сортируем пары по возрастанию
+$h_i=\max\{1,\sqrt{\Lambda_i/\delta},M_i/\delta\}$. В формулах прохода
+индексы относятся к этому порядку. Вводим
+\begin{align}
+ \alpha_0&=1,& \alpha_{t+1}&=\frac{2}{1+\sqrt{1+4/\alpha_t^2}},\\*
+ T_1&=\ceil{2h_1},&
+ T_i&=\ceil{16h_i/h_{i-1}}\qquad(i>1),\\*
+ a_i&=\alpha_{T_i-1},&
+ s_i&=\prod_{j=1}^{i}a_j,\qquad c_i=\Lambda_i+2M_i/s_i.
+ \label{eq:pa-parameters}
+\end{align}
+Для списка моделей $m_j(z)=H_j\norm{z-u_j}^2/2+\ip{d_j}{z}$
+лист возвращает $\Pi_D\bigl(\sum_j(H_j u_j-d_j)/\sum_j H_j\bigr)$.
+Путь А использует евклидову метрику. В алгоритме~\ref{alg:path-a}
+глубокие центры хранятся в $U$, как в алгоритме~\ref{alg:original}.
+По сравнению с исходным проходом меняются расписание, кривизна
+моделей и поправка центра: она использует $\Pi_D$. Проверки секущих
+и радиуса могут вызвать повтор всего прохода.
+
+\begin{algorithm}[htbp]
+\caption{Путь А. Поиск кривизны и радиуса с проверяемым проходом}
+\label{alg:path-a}
+\begin{algorithmic}[1]
+\REQUIRE $s\in C$, $\rho>0$, $R_0>0$, $(\Lambda_i^0)$, $(M_i)$.
+\STATE $R\gets R_0$, $\delta\gets\rho/3$,
+       $\Lambda_i\gets\max\{\delta,\Lambda_i^0\}$ for all $i$.
+\WHILE{true}
+  \STATE $D\gets C\cap\ball_R(s)$.
+     Sort the pairs and compute $T_i,s_i,c_i$ using \eqref{eq:pa-parameters}.
+  \STATE $U_i\gets s$ for all $i$.
+     $y\gets\pass(1,1,0,\varnothing;U)$.
+  \IF{the pass rejects pair $i$ with threshold $\tau_i$}
+    \STATE $\Lambda_i\gets\max\{2\Lambda_i,\tau_i\}$ using the original pair index.
+  \ELSE
+    \IF{$\norm{y-s}\le R/2$}
+      \RETURN $y$.
+    \ENDIF
+    \STATE $R\gets2R$.
+  \ENDIF
+\ENDWHILE
+\STATE \textbf{procedure} $\pass(k,\beta,b,\mathcal M;U)$
+\IF{$k=n+1$}
+  \RETURN $\displaystyle\arg\min_{z\in D}\sum_{m\in\mathcal M}m(z)$ using the projection formula above.
+\ENDIF
+\STATE $y\gets U_k$.
+\FOR{$t=0,\ldots,T_k-1$}
+  \STATE $u\gets U_k$, $\alpha\gets\alpha_t$, $\beta'\gets\beta\alpha$,
+     $b'\gets b+\beta(1-\alpha)y$.
+  \STATE $x\gets\beta'u+b'$, $g\gets\nabla p_k(x)$,
+     $q\gets Q_k(u)$, $H\gets\beta'c_k$.
+  \STATE $m(z)\gets(H/2)\norm{z-u}^2+\ip{g+q}{z}$.
+  \STATE $v\gets\pass(k+1,\beta',b',[\mathcal M,m];U)$.
+     Propagate any rejection immediately.
+  \STATE $x'\gets\beta'v+b'$.
+     Compute $\tau_k$ using \eqref{eq:secant-test}.
+  \IF{$\tau_k>\Lambda_k$}
+    \RETURN a rejection for pair $k$ with threshold $\tau_k$.
+  \ENDIF
+  \STATE $y\gets(1-\alpha)y+\alpha v$,
+    $U_k\gets\Pi_D\bigl(v+(q-Q_k(v))/H\bigr)$.
+\ENDFOR
+\RETURN $y$.
+\end{algorithmic}
+\end{algorithm}
+
+Секущая в проверке вычисляется по формуле
+\begin{equation}\label{eq:secant-test}
+ \tau_k=\frac{2\ip{\nabla p_k(x')-\nabla p_k(x)}{x'-x}}{\norm{x'-x}^2},
+ \qquad \tau_k=0\quad\text{при }x'=x.
+\end{equation}
+
+\subsection{Гарантия и цена адаптации}
+
+Пусть $r_\star=\norm{s-z^\star}$,
+$\bar R=\max\{R_0,24r_\star\}$ и
+\[
+ A_i^{\rm ball}(R)=
+ \max_{\xi\in C\cap\ball_R(s)}(L_{0,i}+L_{1,i}\norm{\nabla p_i(\xi)}),
+ \qquad
+ \bar\Lambda_i=\max\{\lambda_i,4A_i^{\rm ball}(\bar R)\}.
+\]
+Эти величины используются в анализе. Алгоритму достаточно стартового
+радиуса, желаемой точности, $M_i$ и доступа к проекциям.
+
+\begin{theorem}[Путь А]\label{thm:patha}
+Алгоритм завершается с $z_{\rm out}\in C$ и гарантией
+\eqref{eq:relative}. Все попытки имеют радиус не больше $\bar R$
+и кривизны $\Lambda_i\le\bar\Lambda_i$. Число попыток $N$, включая
+успешную, удовлетворяет
+\begin{equation}\label{eq:pa-restart}
+ N\le 1+\left\lfloor\log_2(\bar R/R_0)\right\rfloor
+       +\sum_i\left\lfloor\log_2(\bar\Lambda_i/\lambda_i)\right\rfloor .
+\end{equation}
+В исходной нумерации для обоих оракулов пары $i$ имеем
+\begin{equation}\label{eq:pa-cost}
+ \max\{N_{\nabla p_i},N_{Q_i}\}\le
+ 6\cdot17^{n-1}N
+ \max\left\{1,\sqrt{3\Lambda_i^{\rm final}/\rho},\,3M_i/\rho\right\}.
+\end{equation}
+\end{theorem}
+
+При $L_{1,i}=0$ можно взять $A_i^{\rm ball}(R)=L_{0,i}$.
+С точностью до констант по глубине и множителя числа попыток
+восстанавливается классическая зависимость по паре. При
+$L_{1,i}>0$ наблюдаемая $\Lambda_i^{\rm final}$ может быть умеренной,
+но верхняя оценка $A_i^{\rm ball}(\bar R)$ в общем случае может расти
+экспоненциально с $L_{1,i}\bar R$. В формуле \eqref{eq:pa-cost}
+оператор и градиент одной пары используют общий максимум.
+
+\subsection{Почему алгоритм работает}
+
+\subsubsection{Сертификат одного шага}
+
+Выпуклость ограничивает остаток линеаризации $p_k$ сверху величиной
+\[
+ \ip{\nabla p_k(x')-\nabla p_k(x)}{x'-x}.
+\]
+Поэтому после проверки
+$(\tau_k/2)\norm{x'-x}^2$ покрывает этот остаток. В координатах
+уровня $f_k(z)=p_k(\beta'z+b')/\beta'$ достаточно кривизны
+$L=\beta'\tau_k$. Из $\beta'\ge s_k$ следует $H\ge L+2M_k$.
+Для сравнения с $w\in D$ пишем $u^+=\Pi_D(v+(Q_k(u)-Q_k(v))/H)$.
+Выпуклость, монотонность и выделение квадрата дают
+\begin{align}
+ m_k(v)-m_k(w)+\frac H2\norm{v-w}^2
+ &\ge f_k(v)-f_k(w)+\ip{Q_k(w)}{v-w}\notag\\
+ &\quad+\frac H2\bigl(\norm{u^+-w}^2-\norm{u-w}^2\bigr).
+ \label{eq:pa-model}
+\end{align}
+При выделении квадрата теряется не больше
+$M_k^2\norm{v-u}^2/(2H)$. Этот член покрывает запас $H-L$.
+
+\subsubsection{Сложение по уровням}
+
+Зазор смешанной задачи на уровне $k$ имеет вид
+\begin{align*}
+ \mathcal G_k(z,w)
+ &=\sum_{j<k}\left(m_j(z)-m_j(w)+\frac{H_j}{2}\norm{z-w}^2\right)\\
+ &\quad+\sum_{i\ge k}\left(
+ \frac{p_i(\beta z+b)-p_i(\beta w+b)}{\beta}
+ +\ip{Q_i(w)}{z-w}\right).
+\end{align*}
+В листе он неположителен по условию оптимальности минимума суммы
+моделей. На шаге $y^+=(1-\alpha)y+\alpha v$ из выпуклости
+и \eqref{eq:pa-model} следует
+\[
+ \frac{\mathcal G_k(y^+,w)-(1-\alpha)\mathcal G_k(y,w)}{\alpha}
+ +\frac H2\bigl(\norm{u^+-w}^2-\norm{u-w}^2\bigr)
+ \le\mathcal G_{k+1}(v,w).
+\]
+Подстановка оценки дочернего уровня и деление ещё на $\alpha$
+показывают, что каждому центру соответствует разность квадратов
+расстояний. Её коэффициент $(\beta c_i/2)\prod_{j=k+1}^{i}a_j^2$
+постоянен вдоль цикла.
+Равенство $(1-\alpha_{t+1})/\alpha_{t+1}^2=1/\alpha_t^2$
+сокращает соседние зазоры. Умножение на $a_k^2$ после суммирования
+даёт оценку для всего вызова уровня $k$. В корне получаем
+\begin{equation}\label{eq:pa-energy}
+ G(y,w)\le \frac12\sum_i \ell_i
+     \bigl(\norm{s-w}^2-\norm{U_i^{\rm out}-w}^2\bigr),
+ \qquad \ell_i=s_i^2c_i.
+\end{equation}
+В частности, эта оценка действует на любом фиксированном выпуклом
+рабочем множестве после принятого прохода без проверки выходного радиуса.
+
+\subsubsection{Расписание и цена прохода}
+
+Обратные веса растут за шаг на величину от $1/2$ до $1$,
+поэтому $1/T\le\alpha_{T-1}\le2/T$.
+Из округления $\prod_{j\le i}T_j\le 3\cdot17^{i-1}h_i$.
+Если $a_1h_1=b_1$, то $1/3\le b_1\le1$ и
+$s_i h_i\le b_1 8^{-(i-1)}$. Это даёт
+$\ell_1\in[\delta b_1^2,3\delta]$ и
+$\ell_i\le7\cdot8^{-(i-1)}\ell_1$ для $i>1$.
+Значит, $\sum_{i>1}\ell_i\le\ell_1$ и $\frac12\sum_i\ell_i\le3\delta$.
+Каждый шаг требует не больше двух вызовов каждого оракула своей пары.
+Лист требует одной проекции, как и каждая операторная поправка.
+Эти оценки действуют и для оборванной попытки. Суммирование
+даёт \eqref{eq:pa-cost}.
+
+\subsubsection{Конечность поиска и глобальный зазор}
+
+Если $z^\star\in D$, то подстановка $w=z^\star$ в корневую оценку
+для префикса даёт $\norm{U_1^t-z^\star}\le\sqrt2 r_\star$.
+Это следует из неотрицательности зазора и
+$\sum_{i>1}\ell_i\le\ell_1$. Из нерастяжимости проекции
+$\norm{u^+-v}\le\norm{v-u}/2$, откуда
+$\norm{v-z^\star}\le2\norm{u^+-z^\star}+\norm{u-z^\star}$.
+Следовательно, выход проходит проверку половины радиуса при
+$R\ge12r_\star$. Вместе с удвоением это даёт границу $\bar R$.
+На любом пробном отрезке $\tau_k\le 2A_i^{\rm ball}(\bar R)$
+для соответствующей исходной пары. Обновляемая координата растёт
+хотя бы вдвое и остаётся под своим пределом. Отсюда
+\eqref{eq:pa-restart}.
+
+На рабочем шаре \eqref{eq:relative} следует из \eqref{eq:pa-energy}.
+Для произвольного $w\in C$ с $d=\norm{w-s}>R$ возьмём
+$w'=(1-\theta)y+\theta w$ с $\theta=R/(2d-R)$.
+Поскольку $\norm{y-s}\le R/2$, имеем $w'\in D$.
+Выпуклость $p$ и монотонность $Q$ дают
+$\theta G(y,w)\le G(y,w')$. Тогда
+$G(y,w)\le\rho R^2/\theta=\rho R(2d-R)\le\rho d^2$.

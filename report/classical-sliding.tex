@@ -1,0 +1,76 @@
+\subsection{Исходный алгоритм слайдинга}\label{sec:classical-algorithm}
+
+В алгоритме~\ref{alg:original} переписан \emph{Algorithm 1} из
+приложения~B статьи~\cite{borodich}. Матрица $P\succ0$ задаёт
+$\norm{z}_P^2=z^\top Pz$. Вместо многоиндексных функций сохраняем
+список $\mathcal M$ уже построенных моделей и аффинное преобразование
+$z\mapsto\beta z+b$ оставшихся функций. На входе уровня $k$ такая
+функция имеет вид $p_i(\beta z+b)/\beta$ для $i\ge k$.
+Вектор $U$ хранит текущие центры и передаётся по ссылке, как в
+строках 28--30 оригинала. Запись $[\mathcal M,m]$ добавляет модель
+в конец списка. Длины $T_k$ и константы $L_i,M_i$ заданы до запуска.
+
+\begin{algorithm}[H]
+\caption{Классический слайдинг Бородич, Гасникова и Ковалёва
+в обозначениях отчёта}\label{alg:original}
+\begin{algorithmic}[1]
+\REQUIRE $x_0\in C$, $P\succ0$, weights $(\alpha_t)$,
+  loop lengths $(T_k)$, constants $(L_i,M_i)$ in the $P$-metric.
+\STATE $U_i\gets x_0$ for all $i$,
+  $s_i\gets\prod_{j=1}^{i}\alpha_{T_j-1}$ for all $i$.
+\RETURN $\classic(1,1,0,\varnothing;U)$.
+\STATE \textbf{procedure} $\classic(k,\beta,b,\mathcal M;U)$
+\IF{$k=n+1$}
+  \RETURN $\displaystyle\arg\min_{z\in C}\sum_{m\in\mathcal M}m(z)$.
+\ENDIF
+\STATE $y\gets U_k$.
+\FOR{$t=0,\ldots,T_k-1$}
+  \STATE $u\gets U_k$, $\alpha\gets\alpha_t$,
+    $\beta'\gets\beta\alpha$, $b'\gets b+\beta(1-\alpha)y$.
+  \STATE $g\gets\nabla p_k(\beta'u+b')$, $q\gets Q_k(u)$,
+    $H\gets\beta'(L_k+M_k/s_k)$.
+  \STATE $m(z)\gets (H/2)\norm{z-u}_P^2+\ip{g+q}{z}$.
+  \STATE $v\gets\classic(k+1,\beta',b',[\mathcal M,m];U)$.
+  \STATE $y\gets(1-\alpha)y+\alpha v$.
+  \STATE $U_k\gets v+(HP)^{-1}(q-Q_k(v))$.
+\ENDFOR
+\RETURN $y$.
+\end{algorithmic}
+\end{algorithm}
+
+На рис.~\ref{fig:recursion} показано дерево для $n=3$ и $T_k=2$.
+Последняя строка алгоритма возвращает среднее текущего вызова.
+Минимизация суммы моделей выполняется в листьях на глубине $n+1$.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[x=1cm,y=1cm]
+  \foreach \a/\b/\c/\d in {
+    0/0/-3.2/-1,0/0/3.2/-1,
+    -3.2/-1/-4.8/-2,-3.2/-1/-1.6/-2,
+    3.2/-1/1.6/-2,3.2/-1/4.8/-2,
+    -4.8/-2/-5.6/-3,-4.8/-2/-4/-3,
+    -1.6/-2/-2.4/-3,-1.6/-2/-.8/-3,
+    1.6/-2/.8/-3,1.6/-2/2.4/-3,
+    4.8/-2/4/-3,4.8/-2/5.6/-3}{
+    \draw[thin] (\a,\b) -- (\c,\d);
+  }
+  \node[slide vertex] at (0,0) {};
+  \foreach \x in {-3.2,3.2}{\node[slide vertex] at (\x,-1) {};}
+  \foreach \x in {-4.8,-1.6,1.6,4.8}{\node[slide vertex] at (\x,-2) {};}
+  \foreach \x in {-5.6,-4,-2.4,-.8,.8,2.4,4,5.6}{
+    \node[rectangle,draw,fill=white,minimum size=3.2pt,inner sep=0pt] at (\x,-3) {};
+  }
+  \node[font=\small,anchor=east] at (-6,0) {$k=1$};
+  \node[font=\small,anchor=east] at (-6,-1) {$k=2$};
+  \node[font=\small,anchor=east] at (-6,-2) {$k=3$};
+  \node[font=\small,anchor=east] at (-6,-3) {$k=4$};
+  \node[font=\small,anchor=west] at (6,0) {1 вызов};
+  \node[font=\small,anchor=west] at (6,-1) {2 вызова};
+  \node[font=\small,anchor=west] at (6,-2) {4 вызова};
+  \node[font=\small,anchor=west] at (6,-3) {8 минимумов};
+\end{tikzpicture}
+\caption{Дерево вызовов при $n=3$ и $T_1=T_2=T_3=2$.
+Кружок обозначает вызов уровня с собственным циклом,
+квадрат обозначает лист.}\label{fig:recursion}
+\end{figure}

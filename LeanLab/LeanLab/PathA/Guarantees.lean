@@ -163,6 +163,32 @@ private theorem operatorSum_monotone {D : Set E} {pairs : List (Pair E)}
     simp only [operatorSum, inner_sub_left, inner_add_left] at *
     linarith only [h, htail]
 
+/-- The scheduled pass certifies the local gap on any convex working set. -/
+theorem scheduled_local_accuracy {D : Set E}
+    (p : ℕ → E → ℝ) (g Q : ℕ → E → E) (Λ M : ℕ → ℝ) {δ : ℝ} (hδ : 0 < δ)
+    (hΛ : ∀ i, δ ≤ Λ i) (hM : ∀ i, 0 ≤ M i)
+    (hm : Monotone (fun i => scale δ (Λ i) (M i))) (n : ℕ)
+    {s : E} (hs : s ∈ D) (P : Projection D) {out : Centers E} :
+    let h := fun i => scale δ (Λ i) (M i)
+    let pairs := scheduledPairs p g Q Λ M h 0 (n + 1)
+    (∀ pair ∈ pairs, Pair.Valid D pair.1 pair.2) →
+    (adaptivePass P pairs s).outcome = .ok out →
+    out.average ∈ D ∧ ∀ w ∈ D,
+      gap (objective pairs) (operatorSum pairs) out.average w ≤ 3 * δ * ‖w - s‖ ^ 2 := by
+  intro h pairs hp hout
+  have hl := adaptivePass_gap P pairs hp hs hout
+  refine ⟨hl.1.1, ?_⟩
+  intro w hw
+  have hh := hl.2 w hw
+  have he := scheduled_energy p g Q Λ M h w (fun _ => s) 0 (n + 1)
+  simp only [enteringWeight, one_pow, one_mul, zero_add, ← Finset.sum_mul] at he
+  change centerEnergy w (fun _ => s) pairs 0 1 = _ at he
+  rw [he, norm_sub_rev s w] at hh
+  have hb := (balance_and_accuracy hδ hΛ hM hm n).2
+  refine hh.trans ?_
+  have hprod := mul_le_mul_of_nonneg_right hb (sq_nonneg ‖w - s‖)
+  linarith only [hprod]
+
 /-- (A.1) for a pass whose secant and outer radius checks have succeeded. -/
 theorem scheduled_accepted_accuracy {C : Set E} (hC : Convex ℝ C)
     (p : ℕ → E → ℝ) (g Q : ℕ → E → E) (Λ M : ℕ → ℝ) {δ : ℝ} (hδ : 0 < δ)
@@ -178,22 +204,14 @@ theorem scheduled_accepted_accuracy {C : Set E} (hC : Convex ℝ C)
       gap (objective pairs) (operatorSum pairs) out.average w ≤ 3 * δ * ‖w - s‖ ^ 2 := by
   intro h pairs hp hout hradius
   have hD := hC.inter (convex_closedBall s R)
-  have hl := adaptivePass_gap P pairs
-    (fun pair hm => Pair.Valid.restrict (hp pair hm) inter_subset_left hD)
-    ⟨hs, Metric.mem_closedBall_self hR.le⟩ hout
-  have hz : out.average ∈ C := hl.1.1.1
+  have hsD : s ∈ region C s R := ⟨hs, Metric.mem_closedBall_self hR.le⟩
+  have hl := scheduled_local_accuracy p g Q Λ M hδ hΛ hM hm n hsD P
+    (fun pair hm => Pair.Valid.restrict (hp pair hm) inter_subset_left hD) hout
+  have hz : out.average ∈ C := hl.1.1
   refine ⟨hz, global_gap_bound (convex_objective hC hp) (operatorSum_monotone hp)
     hz hR (by positivity) hradius ?_⟩
   intro w hw hdist
-  have hh := hl.2 w ⟨hw, by simpa only [Metric.mem_closedBall, dist_eq_norm] using hdist⟩
-  have he := scheduled_energy p g Q Λ M h w (fun _ => s) 0 (n + 1)
-  simp only [enteringWeight, one_pow, one_mul, zero_add, ← Finset.sum_mul] at he
-  change centerEnergy w (fun _ => s) pairs 0 1 = _ at he
-  rw [he, norm_sub_rev s w] at hh
-  have hb := (balance_and_accuracy hδ hΛ hM hm n).2
-  refine hh.trans ?_
-  have hprod := mul_le_mul_of_nonneg_right hb (sq_nonneg ‖w - s‖)
-  linarith only [hprod]
+  exact hl.2 w ⟨hw, by simpa only [Metric.mem_closedBall, dist_eq_norm] using hdist⟩
 
 /-- Once the radius reaches twelve times the distance to a solution, a
 completed pass cannot request another radius doubling. -/
@@ -243,9 +261,9 @@ theorem scheduled_radius_test {C : Set E} (hC : Convex ℝ C)
     (norm_nonneg (s - w))
   exact hrad.trans (HH.trans (by linarith only [hR]))
 
-/-- A rejected scheduled pass reports a component where the update at most
-doubles the uniform secant cap for that component. -/
-theorem scheduled_reject_bound {D : Set E} (P : Projection D) (p : ℕ → E → ℝ)
+/-- A rejection reports a secant threshold bounded by twice the gradient
+Lipschitz constant of its level. -/
+private theorem scheduled_reject_threshold {D : Set E} (P : Projection D) (p : ℕ → E → ℝ)
     (g Q : ℕ → E → E) (Λ M h L : ℕ → ℝ) (n : ℕ) {s : E} (hs : s ∈ D)
     (hp : ∀ pair ∈ scheduledPairs p g Q Λ M h 0 n, Pair.Valid D pair.1 pair.2)
     (hL : ∀ i, 0 ≤ L i)
@@ -253,7 +271,7 @@ theorem scheduled_reject_bound {D : Set E} (P : Projection D) (p : ℕ → E →
     {req : Request} (hr : (adaptivePass P (scheduledPairs p g Q Λ M h 0 n) s).outcome =
       .error req) :
     req.level < n ∧ Λ req.level < req.threshold ∧
-      max (2 * Λ req.level) req.threshold ≤ 4 * L req.level := by
+      req.threshold ≤ 2 * L req.level := by
   let pairs := scheduledPairs p g Q Λ M h 0 n
   obtain ⟨j, pair, x, y, hj, hindex, hx, hy, hfail, hτ⟩ :=
     runPass_error P pairs hp 0 PassFrame.initial (PassFrame.initial_valid D)
@@ -270,7 +288,37 @@ theorem scheduled_reject_bound {D : Set E} (P : Projection D) (p : ℕ → E →
     rw [hτ]
     exact secant_le_of_lipschitz (hL j) (hlip j x hx y hy)
   rw [hrj]
-  exact ⟨hj', hfail, max_le (by linarith only [hfail, hcheck]) (by linarith [hL j])⟩
+  exact ⟨hj', hfail, hcheck⟩
+
+/-- A rejected scheduled pass reports a component where the update at most
+doubles the uniform secant cap for that component. -/
+theorem scheduled_reject_bound {D : Set E} (P : Projection D) (p : ℕ → E → ℝ)
+    (g Q : ℕ → E → E) (Λ M h L : ℕ → ℝ) (n : ℕ) {s : E} (hs : s ∈ D)
+    (hp : ∀ pair ∈ scheduledPairs p g Q Λ M h 0 n, Pair.Valid D pair.1 pair.2)
+    (hL : ∀ i, 0 ≤ L i)
+    (hlip : ∀ i, ∀ x ∈ D, ∀ y ∈ D, ‖g i y - g i x‖ ≤ L i * ‖y - x‖)
+    {req : Request} (hr : (adaptivePass P (scheduledPairs p g Q Λ M h 0 n) s).outcome =
+      .error req) :
+    req.level < n ∧ Λ req.level < req.threshold ∧
+      max (2 * Λ req.level) req.threshold ≤ 4 * L req.level := by
+  obtain ⟨hi, hfail, hcheck⟩ :=
+    scheduled_reject_threshold P p g Q Λ M h L n hs hp hL hlip hr
+  exact ⟨hi, hfail, max_le (by linarith) (by linarith [hL req.level])⟩
+
+/-- Known curvature bounds rule out all secant rejections on the working set. -/
+theorem scheduled_pass_succeeds {D : Set E} (P : Projection D) (p : ℕ → E → ℝ)
+    (g Q : ℕ → E → E) (Λ M h L : ℕ → ℝ) (n : ℕ) {s : E} (hs : s ∈ D)
+    (hp : ∀ pair ∈ scheduledPairs p g Q Λ M h 0 n, Pair.Valid D pair.1 pair.2)
+    (hL : ∀ i, 0 ≤ L i)
+    (hlip : ∀ i, ∀ x ∈ D, ∀ y ∈ D, ‖g i y - g i x‖ ≤ L i * ‖y - x‖)
+    (hΛ : ∀ i, 2 * L i ≤ Λ i) :
+    ∃ out, (adaptivePass P (scheduledPairs p g Q Λ M h 0 n) s).outcome = .ok out := by
+  cases he : (adaptivePass P (scheduledPairs p g Q Λ M h 0 n) s).outcome with
+  | ok out => exact ⟨out, rfl⟩
+  | error req =>
+    obtain ⟨_, hfail, hcheck⟩ :=
+      scheduled_reject_threshold P p g Q Λ M h L n hs hp hL hlip he
+    exact (not_lt_of_ge (hcheck.trans (hΛ req.level)) hfail).elim
 
 private def enteringCalls (h : ℕ → ℝ) : ℕ → ℕ
   | 0 => 1

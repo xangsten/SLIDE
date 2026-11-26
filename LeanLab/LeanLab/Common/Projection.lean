@@ -27,6 +27,25 @@ structure Projection (D : Set E) where
   feasible (x : E) : apply x ∈ D
   normal (x : E) {w : E} : w ∈ D → ⟪x - apply x, w - apply x⟫ ≤ 0
 
+theorem Projection.nonexpansive {D : Set E} (P : Projection D) (x y : E) :
+    ‖P.apply x - P.apply y‖ ≤ ‖x - y‖ := by
+  let d := P.apply x - P.apply y
+  have hx := P.normal x (P.feasible y)
+  have hy := P.normal y (P.feasible x)
+  have hrev : P.apply y - P.apply x = -d := by dsimp [d]; abel
+  rw [hrev, inner_neg_right] at hx
+  change ⟪y - P.apply y, d⟫ ≤ 0 at hy
+  have he : x - y = (x - P.apply x) + d - (y - P.apply y) := by dsimp [d]; abel
+  have hlo : ‖d‖ ^ 2 ≤ ⟪x - y, d⟫ := by
+    rw [he, inner_sub_left, inner_add_left, real_inner_self_eq_norm_sq]
+    linarith only [hx, hy]
+  have hh := hlo.trans (real_inner_le_norm (x - y) d)
+  change ‖d‖ ≤ ‖x - y‖
+  by_cases h : 0 < ‖d‖
+  · apply le_of_mul_le_mul_right _ h
+    simpa only [sq] using hh
+  · linarith [norm_nonneg (x - y), norm_nonneg d]
+
 def mix (α : ℝ) (y v : E) : E := (1 - α) • y + α • v
 
 theorem weight_le_one (j : ℕ) : weight j ≤ 1 := by

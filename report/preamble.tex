@@ -1,0 +1,60 @@
+% Shared formatting for an article compiled with XeLaTeX.
+% Load after \documentclass[12pt,a4paper]{article}.
+% Fonts: Liberation Serif, Liberation Sans, Liberation Mono.
+
+\usepackage{fontspec}
+\setmainfont{Liberation Serif}
+\setsansfont{Liberation Sans}
+\setmonofont[Scale=0.9]{Liberation Mono}
+\usepackage{polyglossia}
+\setmainlanguage{russian}
+\setotherlanguage{english}
+
+\usepackage[a4paper,margin=17mm]{geometry}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{microtype}
+\usepackage{booktabs}
+\usepackage{algorithm,algorithmic}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,calc,positioning}
+\usepackage[section]{placeins}
+\usepackage{titlesec}
+\usepackage{enumitem}
+\usepackage[hidelinks,unicode]{hyperref}
+
+\urlstyle{same}
+\floatname{algorithm}{Алгоритм}
+\renewcommand{\algorithmicrequire}{\textbf{Input:}}
+
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.4em}
+\linespread{1.02}
+\setlength{\emergencystretch}{0.7em}
+\setlist[itemize]{topsep=2pt,itemsep=1pt,parsep=0pt,leftmargin=1.2em}
+\setlist[enumerate]{topsep=2pt,itemsep=1pt,parsep=0pt,leftmargin=1.5em}
+\titleformat{\section}{\large\bfseries}{\thesection.}{0.5em}{}
+\titlespacing*{\section}{0pt}{1.0em}{0.3em}
+\titleformat{\subsection}{\normalsize\bfseries}{\thesubsection.}{0.5em}{}
+\titlespacing*{\subsection}{0pt}{0.7em}{0.15em}
+\setcounter{secnumdepth}{2}
+\titleformat{\subsubsection}[block]{\normalsize\bfseries}{}{0pt}{}
+\titlespacing*{\subsubsection}{0pt}{0.75em}{0.25em}
+\pagestyle{plain}
+\raggedbottom
+\allowdisplaybreaks[2]
+\widowpenalty=8000
+\clubpenalty=8000
+\numberwithin{equation}{section}
+
+\newtheorem{theorem}{Теорема}[section]
+\newtheorem{lemma}[theorem]{Лемма}
+\newtheorem{corollary}[theorem]{Следствие}
+\renewcommand{\proofname}{Доказательство}
+\newcommand{\R}{\mathbb R}
+\newcommand{\norm}[1]{\lVert #1\rVert}
+\newcommand{\ip}[2]{\langle #1,#2\rangle}
+\newcommand{\ball}{\overline B}
+\newcommand{\dist}{\operatorname{dist}}
+\newcommand{\ceil}[1]{\left\lceil #1\right\rceil}
+\newcommand{\OO}{\widetilde{\mathcal O}}
+\newcommand{\code}[1]{\texttt{\detokenize{#1}}}

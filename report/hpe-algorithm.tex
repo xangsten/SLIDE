@@ -1,0 +1,30 @@
+\begin{algorithm}[htbp]
+\caption{Локализованный HPE с внутренним проходом пути А}
+\label{alg:hpe}
+\begin{algorithmic}[1]
+\REQUIRE $x_0\in C$, $\rho>0$, distance bound $R$, smoothness parameters and $(M_i)$.
+\STATE $x\gets x_0$, $S\gets0$, $W\gets0$,
+  $\Gamma_{\min}\gets\rho$, $r\gets\min\{R,1/L_{1,\max}\}$.
+\WHILE{$S<1/(2\rho)$}
+  \STATE Compute $F(x)$ and $\widehat L_i(x)$. \textbf{If} $F(x)=0$, \textbf{return} $x$.
+  \STATE $D\gets C\cap\ball_r(x)$,
+     $\Gamma\gets\max\{\Gamma_{\min},8\norm{F(x)}/r\}$.
+  \WHILE{true}
+    \STATE Form $F_\Gamma$ and compute $L_\Gamma$,
+       $m_\Gamma\gets\ceil{\log_2(128L_\Gamma/\Gamma)}$.
+    \STATE Split the pairs into $2n$ levels and add the regularizer to one function.
+    \STATE Run $m_\Gamma$ passes on fixed $D$, starting from $x$ and reusing each output as the next starting point. Use $\delta=\Gamma/24$ and the known local constants. Let $y$ be the final output.
+    \IF{$\norm{y-x}\ge r/4$ or $\Gamma=\Gamma_{\min}$}
+      \STATE \textbf{break}
+    \ENDIF
+    \STATE $\Gamma\gets\max\{\Gamma_{\min},\Gamma/2\}$.
+  \ENDWHILE
+  \STATE $u\gets\Pi_D(y-F_\Gamma(y)/L_\Gamma)$,
+     $n_D\gets L_\Gamma(y-u)-F_\Gamma(y)$.
+  \STATE $v\gets F(u)+n_D$, $\lambda\gets1/\Gamma$,
+     $x\gets\Pi_C(x-\lambda v)$.
+  \STATE $S\gets S+\lambda$, $W\gets W+\lambda u$.
+\ENDWHILE
+\RETURN $W/S$.
+\end{algorithmic}
+\end{algorithm}

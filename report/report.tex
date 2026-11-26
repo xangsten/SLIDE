@@ -1,0 +1,214 @@
+% Build from this directory with: latexmk -xelatex report.tex
+% Fonts: Liberation Serif, Liberation Sans, Liberation Mono.
+\documentclass[12pt,a4paper]{article}
+
+\input{preamble.tex}
+
+\hypersetup{
+  pdftitle={Слайдинг при обобщённой гладкости},
+  pdfauthor={Исследовательский проект SLIDE}
+}
+
+\newcommand{\pass}{\textsf{Pass}}
+\newcommand{\classic}{\textsf{RecursiveProcedure}}
+\tikzset{
+  slide arrow/.style={-{Latex[length=2mm]},thin},
+  slide box/.style={draw,align=center,inner sep=4pt,font=\small},
+  slide vertex/.style={circle,fill,inner sep=1.6pt}
+}
+
+\begin{document}
+
+\begin{center}
+  {\Large\bfseries Слайдинг при обобщённой гладкости}\\[2pt]
+  {\large Монотонные вариационные неравенства}\\[-1pt]
+  {\large и раздельные оценки оракульной сложности}\\[6pt]
+  Исследовательский отчёт проекта SLIDE\\[2pt]
+  26 ноября 2026 г.
+\end{center}
+
+Слайдинг позволяет обращаться к разным частям задачи с разной частотой.
+Классическая схема Бородич, Гасникова и Ковалёва использует константы
+Липшица градиентов, известные до запуска. В проекте SLIDE рассматривается
+более широкий класс, в котором допустимая скорость изменения градиента
+зависит от его нормы.
+
+\begin{itemize}
+\item \textbf{Путь А.} Адаптивная схема решает монотонное вариационное
+неравенство с симметричной $(L_0,L_1)$-гладкостью. Она подбирает кривизну
+и рабочий радиус по ходу вычислений. Итоговая теорема, включая число
+попыток и бюджеты оракулов по парам, проверена в Lean.
+\item \textbf{Локализованный HPE.} Внешний проксимальный шаг даёт
+разные оценки для градиента и оператора внутри одной пары.
+В общей монотонной задаче ведущие члены по точности имеют порядок
+$\varepsilon^{-1/2}$ и $\varepsilon^{-1}$ соответственно, с точностью
+до логарифмов. Зависимость от $L_{1,\max}R$ полиномиальная.
+\item \textbf{Линейная сходимость.} Если невязка контролирует расстояние
+до множества решений, HPE достигает заданного расстояния за логарифмическое
+по точности число шагов после учёта конечного бюджета длинных шагов.
+Для вычисленной проекционной поправки и критерия остановки есть
+формальные доказательства.
+\end{itemize}
+
+\setcounter{tocdepth}{1}
+\tableofcontents
+
+\clearpage
+\section{Постановка и классический бейзлайн}\label{sec:setup}
+
+Пусть $C\subseteq\R^d$ непусто, замкнуто и выпукло, а $x_0\in C$.
+У нас есть $n\ge1$ пар $(p_i,Q_i)$. Каждая $p_i\colon\R^d\to\R$
+выпукла и дифференцируема. Каждый оператор $Q_i$ монотонен и
+$M_i$-липшицев на $C$. Иными словами, для $x,y\in C$
+\[
+ \ip{Q_i(x)-Q_i(y)}{x-y}\ge0,\qquad
+ \norm{Q_i(x)-Q_i(y)}\le M_i\norm{x-y}.
+\]
+Положим $p=\sum_i p_i$, $Q=\sum_i Q_i$ и $F=\nabla p+Q$.
+Ищем решение $z^\star\in C$ вариационного неравенства
+\begin{equation}\label{eq:vi}
+ \ip{F(z^\star)}{w-z^\star}\ge0\quad\text{для всех }w\in C .
+\end{equation}
+Предполагаем, что решение существует. Условие означает, что в любой
+допустимой точке сравнения направление от $z^\star$ образует с
+$F(z^\star)$ угол не больше прямого. При $Q=0$ это условие первого
+порядка для минимума $p$ на $C$. В выпукло-вогнутой игре $Q$ может
+описывать взаимодействие игроков. Например, билинейный член
+$x^\top B y$ даёт оператор $Q(x,y)=(By,-B^\top x)$.
+
+\subsection{Гладкость, проекции и мера ошибки}
+
+Используем симметричную $(L_{0,i},L_{1,i})$-гладкость в смысле
+Горбунова и соавторов~\cite{gorbunov}. Для $x,y\in\R^d$
+\begin{equation}\label{eq:smooth}
+ \norm{\nabla p_i(y)-\nabla p_i(x)}
+ \le \bigl(L_{0,i}+L_{1,i}\sup_{\xi\in[x,y]}\norm{\nabla p_i(\xi)}\bigr)
+       \norm{y-x}.
+\end{equation}
+Если $L_{1,i}=0$, это обычная липшицевость градиента. Если $L_{1,i}>0$,
+градиент может быть неглобально липшицевым. Например, для $p(t)=\exp(t)$
+достаточно $L_0=0$ и $L_1=1$. По теореме о среднем разность
+градиентов на отрезке контролируется их максимальной нормой там же.
+
+Вычислительная модель позволяет запрашивать $\nabla p_i$ и $Q_i$
+по отдельности. Мы считаем число их вызовов в исходной нумерации.
+Значения $p_i$ алгоритм не запрашивает. $\Pi_D$ обозначает точную
+евклидову проекцию на непустое замкнутое выпуклое множество $D$.
+Она удовлетворяет
+$\ip{a-\Pi_D(a)}{w-\Pi_D(a)}\le0$ при $w\in D$.
+Проекции на $C$ и на используемые пересечения $C$ с шарами
+считаются доступными оракулами. Их стоимость учитывается отдельно.
+
+Качество допустимой точки $z$ измеряем составным зазором
+\begin{equation}\label{eq:gap}
+ G(z,w)=p(z)-p(w)+\ip{Q(w)}{z-w}.
+\end{equation}
+Из выпуклости и \eqref{eq:vi} следует $G(z,z^\star)\ge0$ при
+$z\in C$. Из монотонности дополнительно следует
+$G(z^\star,w)\le0$ при $w\in C$.
+Для относительной точности $\rho>0$ требуем
+\begin{equation}\label{eq:relative}
+ G(z_{\rm out},w)\le\rho\norm{w-x_0}^2\qquad(w\in C).
+\end{equation}
+Такое условие осмысленно и на неограниченном $C$. На шаре сравнения
+$C\cap\ball_R(x_0)$ оно даёт абсолютную точность $\rho R^2$.
+При $Q=0$ сравнение с $z^\star$ даёт обычную ошибку по значению
+целевой функции.
+
+\subsection{Что переносим из классической статьи}
+
+Основной бейзлайн для общей монотонной задачи --- теорема~4.5 и
+следствие~4.6 работы Бородич, Гасникова и Ковалёва~\cite{borodich}.
+При известных классических константах липшицевости $L_i$ и $M_i$
+они дают относительную оценку зазора и покомпонентный порядок
+\[
+ \mathcal O\!\left(\max\left\{1,\sqrt{L_i/\rho},\,M_i/\rho\right\}\right)
+\]
+для обоих оракулов пары при фиксированном $n$. В этой записи
+поглощены множители от числа уровней и нормировки точности.
+Устройство слайдинга удобно представить на двух парах. Одна итерация
+верхнего уровня строит модель первой пары и сохраняет её на весь
+внутренний цикл второй пары. При длинах циклов $T_1,T_2$ число
+итераций верхнего и внутреннего уровней равно $T_1$ и $T_1T_2$.
+Поэтому один оракул можно вызывать существенно реже другого.
+
+Линейная сходимость в той же статье относится к структурированным
+билинейным седловым задачам с дополнительными предпосылками
+(теорема~4.7). В общей постановке \eqref{eq:vi} линейная скорость
+появится в разделе~\ref{sec:linear} после введения отдельного
+условия на невязку.
+
+\input{classical-sliding.tex}
+\clearpage
+\input{path-a.tex}
+\clearpage
+\input{localized-hpe.tex}
+\clearpage
+\input{linear-convergence.tex}
+
+\clearpage
+\section{Объём формальной проверки}\label{sec:lean}
+
+\vspace{.1em}
+\begin{tabular}{@{}p{.23\linewidth}p{\dimexpr.77\linewidth-2\tabcolsep\relax}@{}}
+\toprule
+\raggedright Результат & Что проверено в Lean \\
+\midrule
+\raggedright Путь А & Рекурсивный проход и проверка секущих, поиск кривизны и радиуса,
+глобальный относительный зазор, бюджеты попыток, оракулов и проекций.
+Главная теорема \code{Family.pathA_of_symmetric}. \\
+\addlinespace[.25em]
+\raggedright Локализованный HPE & Сжатие внутреннего прохода, число перезапусков
+и проб регуляризации, допустимость поправки, относительная невязка,
+глобальный зазор для взвешенного среднего и граница числа внешних шагов
+для сертифицированной последовательности. \\
+\addlinespace[.25em]
+\raggedright Линейная сходимость & Сжатие HPE при оценке расстояния через невязку,
+улучшенный коэффициент при сильной монотонности и конечный критерий
+остановки. Для пути А проверен полный запуск, уменьшающий расстояние
+вдвое при сильной выпуклости суммы. \\
+\bottomrule
+\end{tabular}
+
+Формальная проверка HPE пока опирается на условия для последовательности
+принятых шагов. Построение этой последовательности из всего алгоритма,
+включая формирование $2n$ уровней, и общий подсчёт оракульных вызовов
+даны в текстовом доказательстве разделов~\ref{sec:hpe} и~\ref{sec:linear}.
+Связь с исходным кодом дана через файлы \code{Restart.lean},
+\code{ProximalHPE.lean}, \code{ProximalHPELinear.lean} и
+\code{StrongConvexity.lean} в проекте
+\href{https://github.com/xangsten/SLIDE}{SLIDE}. Отдельная проверка
+ключевых теорем HPE и сильновыпуклого пути А показала только стандартные
+аксиомы Lean.
+
+\begin{thebibliography}{9}
+\raggedright
+\bibitem{borodich}
+E.~Borodich, A.~Gasnikov, D.~Kovalev.
+\textit{On Linear Convergence in Smooth Convex-Concave Bilinearly-Coupled
+Saddle-Point Optimization: Lower Bounds and Optimal Algorithms}.
+ICML, PMLR 267, pp.~5045--5100, 2025.
+\href{https://proceedings.mlr.press/v267/borodich25a.html}{PMLR}.
+
+\bibitem{gorbunov}
+E.~Gorbunov, N.~Tupitsa, S.~Choudhury, A.~Aliev, P.~Richtárik,
+S.~Horváth, M.~Takáč.
+\textit{Methods for Convex \texorpdfstring{$(L_0,L_1)$}{(L0,L1)}-Smooth
+Optimization: Clipping, Acceleration, and Adaptivity}.
+ICLR, 2025.
+\href{https://arxiv.org/abs/2409.14989}{arXiv:2409.14989}.
+
+\bibitem{monteiro}
+R.~D.~C.~Monteiro, B.~F.~Svaiter.
+\textit{On the Complexity of the Hybrid Proximal Extragradient Method
+for the Iterates and the Ergodic Mean}.
+SIAM J.~Optim., 20(6), pp.~2755--2787, 2010.
+\href{https://doi.org/10.1137/090753127}{DOI}.
+
+\bibitem{leventhal}
+D.~Leventhal.
+\textit{Metric Subregularity and the Proximal Point Method}.
+J.~Math.~Anal.~Appl., 360(2), pp.~681--688, 2009.
+\href{https://arxiv.org/abs/0902.4200}{arXiv:0902.4200}.
+\end{thebibliography}
+\end{document}
